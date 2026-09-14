@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { customerAPI, billAPI } from '../utils/firestoreAPI';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime, formatDate } from '../utils/dateFormat';
+import { normalizeMobile, isValidMobile, isValidName, isValidDob } from '../utils/validation';
 
 function Customers() {
   const { user, profile } = useAuth();
@@ -50,10 +51,21 @@ function Customers() {
   };
 
   const handleSubmit = async () => {
+    // ---- validation ----
+    if (!isValidName(formData.name)) {
+      return alert('Please enter a valid name (2–60 characters).');
+    }
+    if (!formData.mobile || !isValidMobile(formData.mobile)) {
+      return alert('Please enter a valid 10-digit mobile number starting with 6-9 (e.g. 9876543210).');
+    }
+    if (!isValidDob(formData.dob)) {
+      return alert('Date of birth cannot be in the future.');
+    }
+    const payload = { ...formData, mobile: normalizeMobile(formData.mobile) };
     try {
-      if (editingCustomer) await customerAPI.update(user.uid, editingCustomer.id, formData);
+      if (editingCustomer) await customerAPI.update(user.uid, editingCustomer.id, payload);
       else await customerAPI.create(
-        user.uid, formData, { customerPrefix: profile?.customerPrefix }
+        user.uid, payload, { customerPrefix: profile?.customerPrefix }
       );
       setShowModal(false);
       loadCustomers();
@@ -71,10 +83,16 @@ function Customers() {
 
   const field = (key) => (
     <div className="form-group" key={key}>
-      <label>{key.charAt(0).toUpperCase() + key.slice(1)}{['name','mobile'].includes(key) ? ' *' : ''}</label>
+      <label>{key === 'dob' ? 'Date of Birth' : key === 'mobile' ? 'Mobile Number' : key.charAt(0).toUpperCase() + key.slice(1)}{['name','mobile'].includes(key) ? ' *' : ''}</label>
       {['address','notes'].includes(key)
         ? <textarea value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />
-        : <input type="text" value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />}
+        : key === 'mobile'
+        ? <input type="tel" inputMode="numeric" maxLength={12} placeholder="10-digit mobile"
+            value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value.replace(/[^0-9+ ]/g, '') })} />
+        : key === 'dob'
+        ? <input type="date" max={new Date().toISOString().slice(0, 10)}
+            value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />
+        : <input type="text" maxLength={60} value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />}
     </div>
   );
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
+import { normalizeMobile, isValidMobile, isValidName } from '../utils/validation';
 
 const BUSINESS_TYPES = [
   { id: 'salon',      label: 'Salon / Spa',      icon: 'fa-scissors' },
@@ -98,7 +99,16 @@ function Onboarding() {
   const handleNext = () => setStep(step + 1);
   const handleBack = () => setStep(step - 1);
 
+  /* Step-1 gate: keep users from advancing with invalid contact details. */
+  const step1Valid = isValidName(businessData.businessName)
+    && isValidName(businessData.ownerName)
+    && isValidMobile(businessData.phone);
+
   const handleFinish = async () => {
+    // ---- validation (defence in depth; step 1 already gated) ----
+    if (!isValidName(businessData.businessName)) { alert('Business name must be 2-60 characters.'); setStep(1); return; }
+    if (!isValidName(businessData.ownerName)) { alert('Owner name must be 2-60 characters.'); setStep(1); return; }
+    if (!isValidMobile(businessData.phone)) { alert('Enter a valid 10-digit mobile number starting with 6-9.'); setStep(1); return; }
     setLoading(true);
     try {
       const uid = user.uid;
@@ -107,6 +117,7 @@ function Onboarding() {
       // Save business profile (AuthContext.setProfile persists to Supabase)
       const profileData = {
         ...businessData,
+        phone: normalizeMobile(businessData.phone),
         businessType,
         email: user.email,
       };
@@ -288,9 +299,12 @@ function Onboarding() {
                 </label>
                 <input
                   style={inputStyle}
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={12}
                   placeholder="10-digit mobile number"
                   value={businessData.phone}
-                  onChange={(e) => setBusinessData({ ...businessData, phone: e.target.value })}
+                  onChange={(e) => setBusinessData({ ...businessData, phone: e.target.value.replace(/[^0-9+ ]/g, '') })}
                   onFocus={(e) => e.target.style.borderColor = '#667eea'}
                   onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
                 />
@@ -307,13 +321,13 @@ function Onboarding() {
               </button>
               <button
                 onClick={handleNext}
-                disabled={!businessData.businessName || !businessData.ownerName || !businessData.phone}
+                disabled={!step1Valid}
                 style={{
                   flex: 2, padding: '14px',
                   background: 'linear-gradient(135deg, #667eea, #764ba2)',
                   color: 'white', border: 'none', borderRadius: '12px',
                   fontSize: '16px', fontWeight: '600', cursor: 'pointer',
-                  opacity: (!businessData.businessName || !businessData.ownerName || !businessData.phone) ? 0.5 : 1
+                  opacity: step1Valid ? 1 : 0.5
                 }}
               >
                 Next →

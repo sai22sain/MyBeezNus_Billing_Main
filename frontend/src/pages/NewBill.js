@@ -5,6 +5,7 @@ import { cacheKeys } from '../utils/firestoreAPI';
 import { CACHE_TTL } from '../utils/core/cache';
 import { useAuth } from '../context/AuthContext';
 import { isPro, FREE_LIMITS } from '../utils/subscription';
+import { normalizeMobile, isValidMobile, isValidName, isValidDob } from '../utils/validation';
 import { useNavigate } from 'react-router-dom';
 
 function NewBill() {
@@ -66,11 +67,22 @@ function NewBill() {
   };
 
   const addNewCustomer = async () => {
+    // ---- validation ----
+    if (!isValidName(newCustomer.name)) {
+      return setMessage({ type: 'error', text: 'Please enter a valid name (2–60 characters).' });
+    }
+    if (!newCustomer.mobile || !isValidMobile(newCustomer.mobile)) {
+      return setMessage({ type: 'error', text: 'Enter a valid 10-digit mobile starting with 6-9 (e.g. 9876543210).' });
+    }
+    if (!isValidDob(newCustomer.dob)) {
+      return setMessage({ type: 'error', text: 'Date of birth cannot be in the future.' });
+    }
+    const payload = { ...newCustomer, mobile: normalizeMobile(newCustomer.mobile) };
     try {
       const result = await customerAPI.create(
-        user.uid, newCustomer, { customerPrefix: profile?.customerPrefix }
+        user.uid, payload, { customerPrefix: profile?.customerPrefix }
       );
-      setSelectedCustomer({ ...newCustomer, id: result.id, customerId: result.customerId });
+      setSelectedCustomer({ ...payload, id: result.id, customerId: result.customerId });
       setShowCustomerModal(false);
       setMessage({ type: 'success', text: 'Customer added!' });
     } catch (e) {
@@ -303,13 +315,17 @@ function NewBill() {
             </div>
             {['name', 'mobile'].map(f => (
               <div className="form-group" key={f}>
-                <label>{f.charAt(0).toUpperCase() + f.slice(1)} *</label>
-                <input type="text" value={newCustomer[f]} onChange={e => setNewCustomer({ ...newCustomer, [f]: e.target.value })} />
+                <label>{f === 'mobile' ? 'Mobile Number' : f.charAt(0).toUpperCase() + f.slice(1)} *</label>
+                {f === 'mobile'
+                  ? <input type="tel" inputMode="numeric" maxLength={12} placeholder="10-digit mobile"
+                      value={newCustomer[f]} onChange={e => setNewCustomer({ ...newCustomer, [f]: e.target.value.replace(/[^0-9+ ]/g, '') })} />
+                  : <input type="text" maxLength={60}
+                      value={newCustomer[f]} onChange={e => setNewCustomer({ ...newCustomer, [f]: e.target.value })} />}
               </div>
             ))}
             <div className="form-group">
               <label>Date of Birth</label>
-              <input type="date" value={newCustomer.dob} onChange={e => setNewCustomer({ ...newCustomer, dob: e.target.value })} />
+              <input type="date" max={new Date().toISOString().slice(0, 10)} value={newCustomer.dob} onChange={e => setNewCustomer({ ...newCustomer, dob: e.target.value })} />
             </div>
             <div className="form-group">
               <label>Gender</label>

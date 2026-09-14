@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
+import { normalizeMobile, isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
 
 const SECTION = ({ icon, title, subtitle, children }) => (
   <div className="settings-section">
@@ -46,9 +47,45 @@ function Settings() {
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   const handleSave = async () => {
+    // ---- validation ----
+    if (!form.businessName || form.businessName.trim().length < 2) {
+      return alert('Business name is required (at least 2 characters).');
+    }
+    if (form.phone && !isValidMobile(form.phone)) {
+      return alert('Phone number: enter a valid 10-digit Indian mobile (e.g. 9876543210), or leave it empty.');
+    }
+    if (form.whatsappNumber && !isValidMobile(form.whatsappNumber)) {
+      return alert('WhatsApp number: enter a valid 10-digit Indian mobile with country code (e.g. +919876543210), or leave it empty.');
+    }
+    if (!isValidEmail(form.email)) {
+      return alert('Please enter a valid email address.');
+    }
+    if (!isValidPincode(form.pincode)) {
+      return alert('Pincode must be a valid 6-digit Indian pincode (e.g. 560001).');
+    }
+    if (!isValidGst(form.gstNumber)) {
+      return alert('GST number format is invalid. Expected 15 characters like 22AAAAA0000A1Z5, or leave it empty.');
+    }
+    const tax = parseFloat(form.defaultTax);
+    if (isNaN(tax) || tax < 0 || tax > 100) {
+      return alert('Default tax rate must be between 0 and 100.');
+    }
+    if (form.billPrefix && !/^[A-Za-z0-9-]{1,10}$/.test(form.billPrefix.trim())) {
+      return alert('Bill prefix must be 1-10 letters/numbers/dashes (e.g. BILL).');
+    }
+    if (form.customerPrefix && !/^[A-Za-z0-9-]{1,10}$/.test(form.customerPrefix.trim())) {
+      return alert('Customer prefix must be 1-10 letters/numbers/dashes (e.g. CUST).');
+    }
+
     setSaving(true);
     try {
-      await setProfile({ ...profile, ...form });
+      await setProfile({
+        ...profile,
+        ...form,
+        phone: normalizeMobile(form.phone),
+        whatsappNumber: normalizeMobile(form.whatsappNumber),
+        defaultTax: String(tax),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
