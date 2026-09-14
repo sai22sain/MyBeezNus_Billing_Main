@@ -63,12 +63,9 @@ async function api(method, url, body, retried) {
 function renderStats() {
   const s = snapshot.stats || {};
   const cards = [
-    ['Registered users', s.totalUsers],
-    ['Onboarded salons', s.onboardedUsers],
+    ['Active users', s.activeUsers],
+    ['Total signups', s.totalSignups],
     ['Total bills', s.totalBills],
-    ['Total customers', s.totalCustomers],
-    ['Total items', s.totalItems],
-    ['Total categories', s.totalCategories],
     ['All-time revenue', fmtMoney(s.totalRevenue)],
     ['Today revenue', fmtMoney(s.todayRevenue)],
     ['This month revenue', fmtMoney(s.monthRevenue)],
@@ -88,7 +85,7 @@ function renderRequests() {
 
   const body = $('requestsBody');
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="7" class="empty">No deletion requests yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="empty">No deletion requests yet.</td></tr>';
     return;
   }
 
@@ -102,7 +99,6 @@ function renderRequests() {
       '<td>' + who + '</td>' +
       '<td>' + esc(r.email) + '</td>' +
       '<td class="num">' + num(r.bills) + '</td>' +
-      '<td class="num">' + num(r.customers) + '</td>' +
       '<td class="muted">' + esc(fmtDate(r.requestedAt)) + '</td>' +
       '<td><span class="badge badge-' + esc(r.status) + '">' + esc(r.status) + '</span></td>' +
       '<td>' + actions + '</td>' +
@@ -120,7 +116,7 @@ function renderUsers() {
 
   const body = $('usersBody');
   if (!users.length) {
-    body.innerHTML = '<tr><td colspan="10" class="empty">No users match.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="empty">No active users match.</td></tr>';
     return;
   }
 
@@ -133,8 +129,6 @@ function renderUsers() {
       '<td>' + esc(u.phone) + '</td>' +
       '<td class="muted">' + esc(fmtDate(u.createdAt)) + '</td>' +
       '<td class="num">' + num(u.bills) + '</td>' +
-      '<td class="num">' + num(u.customers) + '</td>' +
-      '<td class="num">' + num(u.items) + '</td>' +
       '<td class="num">' + esc(fmtMoney(u.revenue)) + '</td>' +
       '<td><button class="btn btn-danger" data-delete="' + esc(u.uid) + '" data-label="' +
         esc(u.businessName || u.email) + '">Delete</button></td>' +

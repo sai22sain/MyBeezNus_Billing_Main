@@ -214,9 +214,6 @@ async function buildSnapshot() {
     listAuthUsers(),
     fetchAllSafe('profiles', 'user_id, business_name, owner_name, phone, email, city, created_at'),
     fetchAllSafe('bills', 'user_id, final_amount, created_at'),
-    fetchAllSafe('customers', 'user_id'),
-    fetchAllSafe('items', 'user_id'),
-    fetchAllSafe('categories', 'user_id'),
     fetchAllSafe('delete_requests', 'id, user_id, status, requested_at, reviewed_at, admin_notes'),
     fetchAllSafe('deleted_accounts',
       'id, user_id, email, business_name, bills_count, customers_count, deleted_at, deleted_by'),
@@ -225,11 +222,8 @@ async function buildSnapshot() {
   const authUsers = results[0];
   const profiles = results[1];
   const bills = results[2];
-  const customers = results[3];
-  const items = results[4];
-  const categories = results[5];
-  const requests = results[6];
-  const deleted = results[7];
+  const requests = results[3];
+  const deleted = results[4];
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
@@ -241,7 +235,7 @@ async function buildSnapshot() {
 
   const bucket = (uid) => {
     if (!perUser[uid]) {
-      perUser[uid] = { bills: 0, customers: 0, items: 0, categories: 0, revenue: 0 };
+      perUser[uid] = { bills: 0, revenue: 0 };
     }
     return perUser[uid];
   };
@@ -256,41 +250,35 @@ async function buildSnapshot() {
     bkt.bills += 1;
     bkt.revenue += amount;
   }
-  for (const r of customers) bucket(r.user_id).customers += 1;
-  for (const r of items) bucket(r.user_id).items += 1;
-  for (const r of categories) bucket(r.user_id).categories += 1;
 
   const profileByUid = {};
   for (const p of profiles) profileByUid[p.user_id] = p;
 
-  const users = authUsers.map((u) => {
-    const p = profileByUid[u.id] || {};
-    const b = perUser[u.id] || { bills: 0, customers: 0, items: 0, categories: 0, revenue: 0 };
-    return {
-      uid: u.id,
-      email: u.email || p.email || '',
-      businessName: p.business_name || '',
-      ownerName: p.owner_name || '',
-      phone: p.phone || '',
-      city: p.city || '',
-      createdAt: u.created_at || p.created_at || null,
-      lastSignInAt: u.last_sign_in_at || null,
-      onboarded: Boolean(p.business_name),
-      bills: b.bills,
-      customers: b.customers,
-      items: b.items,
-      categories: b.categories,
-      revenue: b.revenue,
-    };
-  });
+  /* Active = has completed onboarding (created a business profile). */
+  const users = authUsers
+    .map((u) => {
+      const p = profileByUid[u.id] || {};
+      const b = perUser[u.id] || { bills: 0, revenue: 0 };
+      return {
+        uid: u.id,
+        email: u.email || p.email || '',
+        businessName: p.business_name || '',
+        ownerName: p.owner_name || '',
+        phone: p.phone || '',
+        city: p.city || '',
+        createdAt: u.created_at || p.created_at || null,
+        lastSignInAt: u.last_sign_in_at || null,
+        onboarded: Boolean(p.business_name),
+        bills: b.bills,
+        revenue: b.revenue,
+      };
+    })
+    .filter((u) => u.onboarded);
 
   const stats = {
-    totalUsers: authUsers.length,
-    onboardedUsers: users.filter((u) => u.onboarded).length,
+    activeUsers: users.length,
+    totalSignups: authUsers.length,
     totalBills: bills.length,
-    totalCustomers: customers.length,
-    totalItems: items.length,
-    totalCategories: categories.length,
     totalRevenue: totalRevenue,
     todayRevenue: todayRevenue,
     monthRevenue: monthRevenue,
@@ -382,7 +370,6 @@ app.get('/api/admin/requests', route(async (_req, res) => {
       email: u.email || '',
       businessName: u.businessName || '',
       bills: u.bills || 0,
-      customers: u.customers || 0,
     };
   });
 
