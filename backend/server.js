@@ -19,9 +19,6 @@ app.use('/api/numbers', require('./src/routes/numbers'));
 app.use('/api/webhooks', require('./src/routes/webhooks'));
 app.use('/api/reports', require('./src/routes/reports'));
 
-// Account management (delete account + all data)
-app.use('/api/account', require('./src/routes/account'));
-
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'MyBills.in API running' }));
 
 app.listen(PORT, () => console.log(`MyBills.in backend running on port ${PORT}`));

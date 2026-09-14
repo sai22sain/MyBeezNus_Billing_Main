@@ -1,12 +1,13 @@
 import React from 'react';
 
 /**
- * Reusable app logo.
- * Uses /logo.svg (copied from the provided "chat logo design").
- * Falls back to /logo.gif, then to the scissors icon if files are missing.
+ * Reusable app logo (tab / favicon bee).
+ * Primary: /Bee_Tab_Icon.gif (animated)
+ * Fallback: /Bee_Tab_Icon.jpeg (for browsers that don't support GIF favicons / animation)
+ * Final fallback: scissors icon tile if files are missing.
  */
 function Logo({ size = 38, radius = 10, className = '', style = {} }) {
-  const [src, setSrc] = React.useState('/logo.svg?v=2');
+  const [src, setSrc] = React.useState('/Bee_Tab_Icon.gif');
 
   if (src === null) {
     return (
@@ -48,7 +49,9 @@ function Logo({ size = 38, radius = 10, className = '', style = {} }) {
         background: '#fff',
         ...style,
       }}
-      onError={() => setSrc((prev) => (prev === '/logo.svg' ? '/logo.gif' : null))}
+      onError={() =>
+        setSrc((prev) => (prev === '/Bee_Tab_Icon.gif' ? '/Bee_Tab_Icon.jpeg' : null))
+      }
     />
   );
 }

@@ -64,10 +64,12 @@ function AppShell() {
       {/* Sidebar — desktop */}
       <nav className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-brand">
-            <Logo size={38} radius={10} />
-            <span className="sidebar-brand-name">MyBeezNus Billing</span>
-          </div>
+          <Link to="/" title="Go to homepage" style={{ textDecoration: 'none' }}>
+            <div className="sidebar-brand">
+              <Logo size={38} radius={10} />
+              <span className="sidebar-brand-name">MyBeezNus Billing</span>
+            </div>
+          </Link>
           <div className="sidebar-salon-name">{profile.businessName}</div>
           <div className="sidebar-email">{user.email}</div>
         </div>
@@ -91,8 +93,10 @@ function AppShell() {
       {/* Mobile top bar */}
       <div className="mobile-topbar">
         <div className="mobile-topbar-brand">
-          <Logo size={30} radius={8} />
-          <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)' }}>MyBeezNus Billing</span>
+          <Link to="/" title="Go to homepage" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Logo size={30} radius={8} />
+            <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)' }}>MyBeezNus Billing</span>
+          </Link>
         </div>
         <button className="mobile-menu-btn" onClick={() => setDrawerOpen(true)}>
           <i className="fas fa-bars"></i>
@@ -104,10 +108,12 @@ function AppShell() {
         <div className="drawer-overlay" onClick={() => setDrawerOpen(false)}>
           <nav className="drawer" onClick={e => e.stopPropagation()}>
             <div className="drawer-header">
-              <div className="sidebar-brand">
-                <Logo size={34} radius={9} />
-                <span className="sidebar-brand-name">MyBeezNus Billing</span>
-              </div>
+              <Link to="/" onClick={() => setDrawerOpen(false)} title="Go to homepage" style={{ textDecoration: 'none' }}>
+                <div className="sidebar-brand">
+                  <Logo size={34} radius={9} />
+                  <span className="sidebar-brand-name">MyBeezNus Billing</span>
+                </div>
+              </Link>
               <button className="close-btn" onClick={() => setDrawerOpen(false)}>×</button>
             </div>
             <div style={{ padding: '8px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-sidebar-muted)' }}>Menu</div>

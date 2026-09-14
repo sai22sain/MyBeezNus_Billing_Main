@@ -8,6 +8,10 @@ yarn.lock
 *.db
 *.sqlite
 
+# Local DB backups / dumps
+backups/
+*.bak
+
 # Environment variables
 .env
 .env.local

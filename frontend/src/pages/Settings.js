@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
 const SECTION = ({ icon, title, subtitle, children }) => (
   <div className="settings-section">
     <div className="settings-section-header">
@@ -33,6 +31,7 @@ function Settings() {
     showTaxOnBill: true, showGstOnBill: false,
   });
   const [saved, setSaved] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -58,30 +57,45 @@ function Settings() {
     setSaving(false);
   };
 
-  const handleDeleteAccount = async () => {
-    if (!window.confirm('Are you sure? This will permanently delete your account and ALL data (bills, customers, items, settings). This cannot be undone.')) {
+  const handleRequestDeletion = async () => {
+    if (!window.confirm('Request account deletion? This sends a request to support. Your account and data are deleted only after admin approval.')) {
+      return;
+    }
+    const uid = user && user.uid;
+    if (!uid) {
+      alert('Could not submit deletion request: you are not signed in.');
       return;
     }
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-      const res = await fetch(`${API_URL}/api/account/delete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Server returned ${res.status}`);
+      // Already requested? Do not create a second row.
+      const { data: existing, error: checkErr } = await supabase
+        .from('delete_requests')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (checkErr) throw checkErr;
+      if (existing) {
+        setDeleteMsg('You already have a pending deletion request. Support will contact you.');
+        return;
       }
-      // Endpoint deleted auth user + all data; sign out locally.
-      await supabase.auth.signOut();
-      window.location.href = '/login';
+
+      const { error } = await supabase
+        .from('delete_requests')
+        .insert({ user_id: uid, status: 'pending' });
+      if (error) {
+        // 23505 = unique_violation: a pending request exists (race with another tab)
+        if (error.code === '23505') {
+          setDeleteMsg('You already have a pending deletion request. Support will contact you.');
+          return;
+        }
+        throw error;
+      }
+
+      setDeleteMsg('Deletion request submitted. Support will review it and delete your account.');
     } catch (err) {
-      console.error('[handleDeleteAccount] error:', err);
-      alert('Could not delete account: ' + err.message);
+      console.error('[handleRequestDeletion] error:', err);
+      alert('Could not submit deletion request: ' + err.message);
     }
   };
 
@@ -262,13 +276,14 @@ function Settings() {
           </div>
           <div className="danger-zone-row">
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Delete account</div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>Permanently remove your account and all data</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Request account deletion</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>Ask support to permanently remove your account and all data</div>
             </div>
-            <button className="btn btn-ghost" onClick={handleDeleteAccount}
+            <button className="btn btn-ghost" onClick={handleRequestDeletion}
               style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
-              <i className="fas fa-trash"></i> Delete
+              <i className="fas fa-trash"></i> Request deletion
             </button>
+            {deleteMsg ? (<div style={{ fontSize: 12, marginTop: 6, color: 'var(--color-text-muted)' }}>{deleteMsg}</div>) : null}
           </div>
         </div>
       </SECTION>
