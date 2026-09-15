@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { customerAPI, billAPI, itemAPI } from '../utils/firestoreAPI';
 import { useCachedQuery } from '../hooks/useCachedQuery';
 import { cacheKeys } from '../utils/firestoreAPI';
 import { CACHE_TTL } from '../utils/core/cache';
 import { useAuth } from '../context/AuthContext';
 import { isPro, FREE_LIMITS } from '../utils/subscription';
-import { normalizeMobile, isValidMobile, isValidName, isValidDob } from '../utils/validation';
+import { isValidMobile } from '../utils/validation';
+import { showToast } from '../services/notificationService';
+import { buildBillMessage, openWhatsApp } from '../utils/whatsapp';
 import { useNavigate } from 'react-router-dom';
+import CustomerForm from '../components/CustomerForm';
+import ResponsiveFormModal from '../components/ui/ResponsiveFormModal';
 
 function NewBill() {
   const { user, profile, subscription } = useAuth();
@@ -14,16 +18,19 @@ function NewBill() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [itemSearch, setItemSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [walkInCustomer, setWalkInCustomer] = useState(false);
   const [billItems, setBillItems] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', mobile: '', dob: '', gender: '' });
-  const [message, setMessage] = useState(null);
+  const [customerPrefill, setCustomerPrefill] = useState({ name: '', mobile: '', dob: '', gender: '' });
   const [noCustomerFound, setNoCustomerFound] = useState(false);
   const [customPrice, setCustomPrice] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [savingMode, setSavingMode] = useState(null);
+  const [customerSaving, setCustomerSaving] = useState(false);
 
   // Reference data served from the shared per-user cache (5-min cats,
   // 2-min active items). Mutations on other pages invalidate it.
@@ -39,10 +46,25 @@ function NewBill() {
 
   const searchCustomers = async (query) => {
     if (query.length < 3) { setSearchResults([]); setNoCustomerFound(false); return; }
-    const results = await customerAPI.search(user.uid, query);
-    setSearchResults(results);
-    setNoCustomerFound(results.length === 0);
-    if (results.length === 0) setNewCustomer({ name: '', mobile: query, dob: '', gender: '' });
+    try {
+      const results = await customerAPI.search(user.uid, query);
+      setSearchResults(results);
+      setNoCustomerFound(results.length === 0);
+    } catch {
+      setSearchResults([]);
+      showToast({ type: 'error', message: 'Unable to search customers. Please try again.' });
+    }
+  };
+
+  const openCustomerForm = () => {
+    const rawQuery = searchQuery.trim();
+    const digits = rawQuery.replace(/\D/g, '');
+    const mobileMatch = digits.match(/(?:91|0)?([6-9]\d{9})/);
+    const mobile = mobileMatch ? mobileMatch[1] : '';
+    const detectedName = rawQuery.replace(mobileMatch?.[0] || '', '').replace(/[+,()-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const name = /[a-zA-Z]/.test(detectedName) ? detectedName : '';
+    setCustomerPrefill({ name, mobile, dob: '', gender: '' });
+    setShowCustomerModal(true);
   };
 
   const addItemToBill = (item) => {
@@ -66,277 +88,130 @@ function NewBill() {
     return { subtotal, tax, finalTotal: subtotal + tax - discount };
   };
 
-  const addNewCustomer = async () => {
-    // ---- validation ----
-    if (!isValidName(newCustomer.name)) {
-      return setMessage({ type: 'error', text: 'Please enter a valid name (2–60 characters).' });
-    }
-    if (!newCustomer.mobile || !isValidMobile(newCustomer.mobile)) {
-      return setMessage({ type: 'error', text: 'Enter a valid 10-digit mobile starting with 6-9 (e.g. 9876543210).' });
-    }
-    if (!isValidDob(newCustomer.dob)) {
-      return setMessage({ type: 'error', text: 'Date of birth cannot be in the future.' });
-    }
-    const payload = { ...newCustomer, mobile: normalizeMobile(newCustomer.mobile) };
-    try {
-      const result = await customerAPI.create(
-        user.uid, payload, { customerPrefix: profile?.customerPrefix }
-      );
-      setSelectedCustomer({ ...payload, id: result.id, customerId: result.customerId });
-      setShowCustomerModal(false);
-      setMessage({ type: 'success', text: 'Customer added!' });
-    } catch (e) {
-      console.error('Add customer failed:', e);
-      setMessage({ type: 'error', text: `Error adding customer${e?.message ? ` — ${e.message}` : ''}` });
-    }
+  const handleCustomerSaved = (customer) => {
+    setSelectedCustomer(customer);
+    setSearchQuery('');
+    setSearchResults([]);
+    setNoCustomerFound(false);
+    setShowCustomerModal(false);
+    showToast({ type: 'success', message: 'Customer added successfully.' });
   };
 
-  const createBill = async () => {
-    if (!selectedCustomer) return setMessage({ type: 'error', text: 'Please select a customer' });
-    if (billItems.length === 0) return setMessage({ type: 'error', text: 'Please add items to the bill' });
+  const createBill = async (sendWhatsApp = false) => {
+    if (!selectedCustomer && !walkInCustomer && !profile?.allowBillingWithoutCustomer) return showToast({ type: 'warning', message: 'Please select a customer.' });
+    if (billItems.length === 0) return showToast({ type: 'warning', message: 'Please add items to the bill.' });
+    if (saving) return;
+    setSaving(true);
+    setSavingMode(sendWhatsApp ? 'whatsapp' : 'save');
 
     if (!isPro(subscription)) {
       const allBills = await billAPI.getAll(user.uid);
       const now = new Date();
       const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       if (allBills.filter(b => b.createdAt?.startsWith(prefix)).length >= FREE_LIMITS.bills) {
-        return setMessage({ type: 'error', text: `Free plan limit reached (${FREE_LIMITS.bills} bills/month).`, upgrade: true });
+        setSaving(false);
+        return showToast({ type: 'warning', message: `Free plan limit reached (${FREE_LIMITS.bills} bills/month). Upgrade to continue.` });
       }
     }
 
     try {
       const totals = calculateTotals();
       const result = await billAPI.create(user.uid, {
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        customerMobile: selectedCustomer.mobile,
+        customerId: selectedCustomer?.id || null,
+        customerName: selectedCustomer?.name || 'Walk-in customer',
+        customerMobile: selectedCustomer?.mobile || '',
         items: billItems, discount, paymentMode,
         totalAmount: totals.subtotal, tax: totals.tax, finalAmount: totals.finalTotal
       }, { billPrefix: profile?.billPrefix });
-      const msg = `Hello ${selectedCustomer.name},\n\nThank you for shopping with ${profile?.businessName || 'us'}!\n\nBill No: ${result.billNumber}\nTotal: ₹${totals.finalTotal.toFixed(2)}\nPayment: ${paymentMode}\n\nItems:\n${billItems.map(i => `- ${i.name} x${i.quantity} = ₹${(i.price * i.quantity).toFixed(2)}`).join('\n')}\n\nThank you!`;
-      window.open(`https://web.whatsapp.com/send?phone=${selectedCustomer.mobile.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(msg)}`, '_blank');
-      setMessage({ type: 'success', text: `Bill ${result.billNumber} created!` });
-      setSelectedCustomer(null); setBillItems([]); setDiscount(0); setPaymentMode('Cash');
-    } catch { setMessage({ type: 'error', text: 'Error creating bill' }); }
+      showToast({ type: 'success', message: `Bill ${result.billNumber} saved successfully.` });
+      if (sendWhatsApp) {
+        if (!selectedCustomer) {
+          showToast({ type: 'info', message: 'Bill saved. A customer and WhatsApp number are required to send this bill.' });
+        } else if (!isValidMobile(selectedCustomer.mobile)) {
+          showToast({ type: 'warning', message: "Bill saved successfully, but this customer doesn't have a valid WhatsApp number." });
+        } else {
+          const messageText = buildBillMessage({ billNumber: result.billNumber, customerName: selectedCustomer.name, businessName: profile?.businessName, total: totals.finalTotal, paymentMode, items: billItems });
+          if (openWhatsApp(selectedCustomer.mobile, messageText)) showToast({ type: 'info', message: 'Bill saved. WhatsApp opened with the bill ready to send.' });
+          else showToast({ type: 'warning', message: "Bill saved successfully. WhatsApp isn't available on this device." });
+        }
+      }
+      setSelectedCustomer(null); setWalkInCustomer(false); setBillItems([]); setDiscount(0); setPaymentMode('Cash');
+    } catch { showToast({ type: 'error', message: 'Unable to save the bill. Please try again.' }); }
+    finally { setSaving(false); setSavingMode(null); }
   };
 
-  const filteredItems = items.filter(item =>
+  const filteredItems = useMemo(() => items.filter(item =>
     (!selectedCategory || item.categoryId === selectedCategory) &&
-    (!itemSearch || item.name?.toLowerCase().includes(itemSearch.toLowerCase()))
-  );
+    (!itemSearch || `${item.name || ''} ${item.categoryName || ''}`.toLowerCase().includes(itemSearch.toLowerCase()))
+  ), [items, selectedCategory, itemSearch]);
 
   const totals = calculateTotals();
 
   return (
-    <div>
-      <div className="page-header"><h1>New Bill</h1></div>
-
-      {message && (
-        <div className={`alert alert-${message.type === 'success' ? 'success' : 'error'}`}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span>{message.text}</span>
-          {message.upgrade && (
-            <button className="btn btn-primary" onClick={() => navigate('/pricing')} style={{ marginLeft: 12, whiteSpace: 'nowrap' }}>
-              <i className="fas fa-crown"></i> Upgrade to Pro
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="new-bill-layout">
-        {/* Left panel */}
+    <div className="billing-page">
+      <header className="billing-header">
         <div>
-          {/* Customer */}
-          <div className="card">
-            <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: 12 }}>Customer</div>
-            {selectedCustomer ? (
-              <div className="customer-selected">
-                <div className="customer-selected-name">{selectedCustomer.name}</div>
-                <div className="customer-selected-mobile">{selectedCustomer.mobile}</div>
-                <button className="btn btn-ghost" onClick={() => setSelectedCustomer(null)} style={{ fontSize: 12, padding: '6px 12px' }}>
-                  Change
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="form-group" style={{ marginBottom: 8 }}>
-                  <input type="text" placeholder="Search by mobile or name..."
-                    value={searchQuery}
-                    onChange={e => { setSearchQuery(e.target.value); searchCustomers(e.target.value); }} />
-                </div>
-                {searchResults.length > 0 && (
-                  <div className="customer-dropdown">
-                    {searchResults.map(c => (
-                      <div key={c.id} className="customer-dropdown-item"
-                        onClick={() => { setSelectedCustomer(c); setSearchQuery(''); setSearchResults([]); }}>
-                        <div className="customer-dropdown-name">{c.name}</div>
-                        <div className="customer-dropdown-mobile">{c.mobile}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {noCustomerFound && (
-                  <div className="no-customer-found">
-                    <p>No customer found for "{searchQuery}"</p>
-                    <button className="btn btn-primary" onClick={() => setShowCustomerModal(true)} style={{ width: '100%' }}>
-                      <i className="fas fa-user-plus"></i> Add as New Customer
-                    </button>
-                  </div>
-                )}
-                {!noCustomerFound && (
-                  <button className="btn btn-ghost" onClick={() => setShowCustomerModal(true)} style={{ width: '100%', marginTop: 4 }}>
-                    <i className="fas fa-user-plus"></i> Add New Customer
-                  </button>
-                )}
-              </>
-            )}
+          <div className="billing-kicker"><i className="fas fa-bolt"></i> Fast billing workspace</div>
+          <h1>New Bill</h1>
+          <p>{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} <span>·</span> Draft invoice</p>
+        </div>
+        <div className="billing-header-meta">
+          <span className="billing-status"><i className="fas fa-circle"></i> Ready</span>
+          <span className="billing-bill-hint">Bill number assigned on save</span>
+        </div>
+      </header>
+
+      <div className="billing-workspace">
+        <section className="billing-catalog" aria-labelledby="catalog-title">
+          <div className="billing-section-heading">
+            <div><span className="billing-eyebrow">Build the bill</span><h2 id="catalog-title">Item catalog</h2></div>
+            <button className="billing-icon-button" type="button" title="Add item" aria-label="Add item" onClick={() => navigate('/items')}><i className="fas fa-plus"></i></button>
+          </div>
+          <label className="billing-search">
+            <i className="fas fa-search"></i>
+            <span className="sr-only">Search items</span>
+            <input type="search" placeholder="Search items or category..." value={itemSearch} onChange={e => setItemSearch(e.target.value)} />
+            <kbd>⌘ K</kbd>
+          </label>
+          <div className="billing-category-filter" aria-label="Filter items by category">
+            <button type="button" className={!selectedCategory ? 'active' : ''} onClick={() => setSelectedCategory(null)}>All</button>
+            {categories.map(cat => <button type="button" key={cat.id} className={selectedCategory === cat.id ? 'active' : ''} onClick={() => setSelectedCategory(cat.id)}>{cat.name}</button>)}
+          </div>
+          <div className="billing-catalog-list">
+            {filteredItems.map(item => <button type="button" key={item.id} className="billing-item-tile" onClick={() => addItemToBill(item)}>
+              <span className="billing-item-tile-icon"><i className="fas fa-plus"></i></span>
+              <span className="billing-item-tile-copy"><strong>{item.name}</strong><small>{item.categoryName || 'Item'}{item.tax ? ` · ${item.tax}% tax` : ''}</small></span>
+              <span className="billing-item-tile-price">₹{Number(item.price).toFixed(0)}</span>
+            </button>)}
+            {filteredItems.length === 0 && !itemSearch && <div className="billing-catalog-empty"><i className="fas fa-box-open"></i><strong>No items available</strong><span>Add your first item to start billing.</span><button type="button" className="billing-inline-link" onClick={() => navigate('/items')}>Add item <i className="fas fa-arrow-right"></i></button></div>}
+            {filteredItems.length === 0 && itemSearch && <div className="billing-custom-item"><span>No match for “{itemSearch}”</span><div><input type="number" aria-label="Custom item price" placeholder="Price ₹" value={customPrice} onChange={e => setCustomPrice(e.target.value)} /><button type="button" className="btn btn-primary" onClick={() => { if (!customPrice) return; addItemToBill({ id: `custom_${Date.now()}`, name: itemSearch, price: parseFloat(customPrice), tax: 0 }); setCustomPrice(''); setItemSearch(''); }}>Add custom</button></div></div>}
+          </div>
+        </section>
+
+        <section className="billing-invoice" aria-labelledby="invoice-title">
+          <div className="billing-section-heading billing-invoice-heading"><div><span className="billing-eyebrow">Live preview</span><h2 id="invoice-title">Current bill</h2></div><span className="billing-item-count">{billItems.reduce((sum, item) => sum + item.quantity, 0)} items</span></div>
+          <div className="billing-customer-row">
+            <div className="billing-customer-label"><span className="billing-eyebrow">Customer</span>{selectedCustomer ? <strong>{selectedCustomer.name}</strong> : walkInCustomer ? <strong>Walk-in customer</strong> : <strong>Select a customer</strong>}{selectedCustomer && <small>{selectedCustomer.mobile || 'No mobile number'}</small>}{walkInCustomer && <small>No customer attached</small>}</div>
+            {selectedCustomer || walkInCustomer ? <button type="button" className="billing-text-button" onClick={() => { setSelectedCustomer(null); setWalkInCustomer(false); }}>Change</button> : <button type="button" className="billing-text-button" onClick={() => setShowCustomerModal(true)}><i className="fas fa-user-plus"></i> Add new</button>}
+          </div>
+          {!selectedCustomer && !walkInCustomer && <div className="billing-customer-picker"><label className="billing-search billing-customer-search"><i className="fas fa-user"></i><span className="sr-only">Search customer</span><input type="search" placeholder="Search by name or mobile..." value={searchQuery} onChange={e => { setSearchQuery(e.target.value); searchCustomers(e.target.value); }} /></label>{profile?.allowBillingWithoutCustomer && <button type="button" className="billing-walkin-button" onClick={() => { setWalkInCustomer(true); setSearchQuery(''); setSearchResults([]); }}><i className="fas fa-person-walking"></i> Continue without customer</button>}{searchResults.length > 0 && <div className="billing-customer-results">{searchResults.map(c => <button type="button" key={c.id} onClick={() => { setSelectedCustomer(c); setSearchQuery(''); setSearchResults([]); setNoCustomerFound(false); }}><span><strong>{c.name}</strong><small>{c.mobile}</small></span><i className="fas fa-arrow-right"></i></button>)}</div>}{noCustomerFound && <div className="billing-no-customer">No customer found. <button type="button" onClick={openCustomerForm}><i className="fas fa-user-plus"></i> Add New Customer</button></div>}</div>}
+
+          <div className="billing-items-area">
+            {billItems.length === 0 ? <div className="billing-empty-invoice"><i className="fas fa-receipt"></i><strong>Your bill is empty</strong><span>Select an item from the catalog to get started.</span></div> : <>
+              <div className="billing-items-head"><span>Item</span><span>Rate</span><span>Qty</span><span>Amount</span><span></span></div>
+              <div className="billing-invoice-items">{billItems.map((item, idx) => <div key={idx} className="billing-invoice-item"><div className="billing-invoice-item-name"><strong>{item.name}</strong>{item.tax ? <small>{item.tax}% tax included</small> : null}</div><input aria-label={`${item.name} price`} type="number" value={item.price} onChange={e => setBillItems(billItems.map((bi, i) => i === idx ? { ...bi, price: parseFloat(e.target.value) || 0 } : bi))} /><div className="billing-quantity"><button type="button" aria-label={`Decrease ${item.name} quantity`} onClick={() => updateQuantity(idx, item.quantity - 1)}>−</button><span>{item.quantity}</span><button type="button" aria-label={`Increase ${item.name} quantity`} onClick={() => updateQuantity(idx, item.quantity + 1)}>+</button></div><strong className="billing-line-total">₹{(item.price * item.quantity).toFixed(2)}</strong><button type="button" className="billing-remove-item" aria-label={`Remove ${item.name}`} onClick={() => updateQuantity(idx, 0)}>×</button></div>)}</div>
+            </>}
           </div>
 
-          {/* Services */}
-          <div className="card">
-            <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: 12 }}>Items</div>
-            <div className="category-tabs" style={{ marginBottom: 12 }}>
-              <button className={`category-tab ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>All</button>
-              {categories.map(cat => (
-                <button key={cat.id} className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory(cat.id)}>{cat.name}</button>
-              ))}
-            </div>
-            <div className="form-group" style={{ marginBottom: 12 }}>
-              <input type="text" placeholder="Search items..." value={itemSearch}
-                onChange={e => setItemSearch(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
-              {filteredItems.map(item => (
-                <button key={item.id} className="service-btn" onClick={() => addItemToBill(item)}>
-                  <span>{item.name}</span>
-                  <span className="service-btn-price">₹{item.price}</span>
-                </button>
-              ))}
-              {filteredItems.length === 0 && itemSearch && (
-                <div className="custom-service-box">
-                  <p>"{itemSearch}" not found. Add as custom?</p>
-                  <div className="custom-service-inputs">
-                    <input type="number" placeholder="Price ₹" value={customPrice}
-                      onChange={e => setCustomPrice(e.target.value)} />
-                    <button className="btn btn-primary" onClick={() => {
-                      if (!customPrice) return;
-                      addItemToBill({ id: `custom_${Date.now()}`, name: itemSearch, price: parseFloat(customPrice), tax: 0 });
-                      setCustomPrice(''); setItemSearch('');
-                    }}>Add</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right panel — Bill Summary */}
-        <div className="card" style={{ position: 'sticky', top: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: 16 }}>Bill Summary</div>
-
-          {billItems.length === 0 ? (
-            <div className="bill-empty">
-              <i className="fas fa-receipt"></i>
-              <p>No items added yet</p>
-              <p style={{ fontSize: 12, marginTop: 4, opacity: 0.6 }}>Click items on the left to add</p>
-            </div>
-          ) : (
-            <>
-              {/* Bill items list */}
-              <div className="bill-items-header">
-                <span>Item</span>
-                <span>Price</span>
-                <span>Qty</span>
-                <span>Total</span>
-                <span></span>
-              </div>
-              <div className="bill-items-list">
-                {billItems.map((item, idx) => (
-                  <div key={idx} className="bill-item-row">
-                    <span className="bill-item-name">{item.name}</span>
-                    <input
-                      type="number"
-                      className="bill-item-input"
-                      value={item.price}
-                      onChange={e => setBillItems(billItems.map((bi, i) => i === idx ? { ...bi, price: parseFloat(e.target.value) || 0 } : bi))}
-                    />
-                    <input
-                      type="number"
-                      className="bill-item-input"
-                      value={item.quantity}
-                      onChange={e => updateQuantity(idx, parseInt(e.target.value))}
-                    />
-                    <span className="bill-item-total">&#8377;{(item.price * item.quantity).toFixed(2)}</span>
-                    <button className="bill-item-remove" onClick={() => updateQuantity(idx, 0)}>&#215;</button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bill-summary-totals">
-                <div className="bill-total-row"><span>Subtotal</span><strong>₹{totals.subtotal.toFixed(2)}</strong></div>
-                <div className="bill-total-row"><span>Tax</span><strong>₹{totals.tax.toFixed(2)}</strong></div>
-                <div className="bill-total-row">
-                  <span>Discount</span>
-                  <input type="number" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                    style={{ width: 90, padding: '4px 8px', border: '1.5px solid var(--color-border)', borderRadius: 6, fontSize: 13, textAlign: 'right' }} />
-                </div>
-                <div className="bill-grand-total">
-                  <span>Total</span>
-                  <span>₹{totals.finalTotal.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="payment-tabs">
-                {['Cash', 'UPI', 'Card'].map(mode => (
-                  <button key={mode} className={`payment-tab ${paymentMode === mode ? 'active' : ''}`}
-                    onClick={() => setPaymentMode(mode)}>
-                    <i className={`fas ${mode === 'Cash' ? 'fa-money-bill' : mode === 'UPI' ? 'fa-mobile-alt' : 'fa-credit-card'}`}></i> {mode}
-                  </button>
-                ))}
-              </div>
-
-              <button className="btn btn-success" onClick={createBill}
-                style={{ width: '100%', padding: '13px', fontSize: 15, marginTop: 4 }}>
-                <i className="fas fa-paper-plane"></i> Save Bill & Send WhatsApp
-              </button>
-            </>
-          )}
-        </div>
+          <div className="billing-summary"><div className="billing-summary-row"><span>Subtotal</span><strong>₹{totals.subtotal.toFixed(2)}</strong></div><div className="billing-summary-row"><span>Tax</span><strong>₹{totals.tax.toFixed(2)}</strong></div><div className="billing-summary-row billing-discount-row"><label htmlFor="bill-discount">Discount</label><input id="bill-discount" type="number" min="0" value={discount} onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} placeholder="0" /></div><div className="billing-total"><span>Total payable</span><strong>₹{Math.max(0, totals.finalTotal).toFixed(2)}</strong></div></div>
+          <div className="billing-payment"><span className="billing-eyebrow">Payment method</span><div className="billing-payment-options">{['Cash', 'UPI', 'Card'].map(mode => <button type="button" key={mode} className={paymentMode === mode ? 'active' : ''} onClick={() => setPaymentMode(mode)}><i className={`fas ${mode === 'Cash' ? 'fa-money-bill' : mode === 'UPI' ? 'fa-mobile-screen-button' : 'fa-credit-card'}`}></i>{mode}</button>)}</div></div>
+          <div className="billing-actions"><button type="button" className="billing-save-button" onClick={() => createBill(false)} disabled={saving}><i className={`fas ${savingMode === 'save' ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>{savingMode === 'save' ? 'Saving...' : 'Save bill'}</button><button type="button" className="billing-whatsapp-button" onClick={() => createBill(true)} disabled={saving}><i className={`fab ${savingMode === 'whatsapp' ? 'fa-spinner fa-spin' : 'fa-whatsapp'}`}></i>{savingMode === 'whatsapp' ? 'Saving & preparing...' : 'Save & send via WhatsApp'}</button></div>
+        </section>
       </div>
 
-      {showCustomerModal && (
-        <div className="modal">
-          <div className="modal-content" style={{ maxWidth: 440 }}>
-            <div className="modal-header">
-              <h2>Add New Customer</h2>
-              <button className="close-btn" onClick={() => setShowCustomerModal(false)}>×</button>
-            </div>
-            {['name', 'mobile'].map(f => (
-              <div className="form-group" key={f}>
-                <label>{f === 'mobile' ? 'Mobile Number' : f.charAt(0).toUpperCase() + f.slice(1)} *</label>
-                {f === 'mobile'
-                  ? <input type="tel" inputMode="numeric" maxLength={12} placeholder="10-digit mobile"
-                      value={newCustomer[f]} onChange={e => setNewCustomer({ ...newCustomer, [f]: e.target.value.replace(/[^0-9+ ]/g, '') })} />
-                  : <input type="text" maxLength={60}
-                      value={newCustomer[f]} onChange={e => setNewCustomer({ ...newCustomer, [f]: e.target.value })} />}
-              </div>
-            ))}
-            <div className="form-group">
-              <label>Date of Birth</label>
-              <input type="date" max={new Date().toISOString().slice(0, 10)} value={newCustomer.dob} onChange={e => setNewCustomer({ ...newCustomer, dob: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Gender</label>
-              <select value={newCustomer.gender} onChange={e => setNewCustomer({ ...newCustomer, gender: e.target.value })}>
-                <option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>
-              </select>
-            </div>
-            <button className="btn btn-primary" onClick={addNewCustomer}>Add Customer</button>
-          </div>
-        </div>
-      )}
+      {showCustomerModal && <ResponsiveFormModal title="Add New Customer" labelledBy="billing-customer-form-title" maxWidth={440} onClose={() => setShowCustomerModal(false)} footer={<><button type="button" className="btn btn-ghost" onClick={() => setShowCustomerModal(false)} disabled={customerSaving}>Cancel</button><button type="submit" form="billing-customer-form" className="btn btn-primary" disabled={customerSaving}><i className={`fas ${customerSaving ? 'fa-spinner fa-spin' : 'fa-user-plus'}`}></i> {customerSaving ? 'Saving...' : 'Add Customer'}</button></>}>
+        <CustomerForm user={user} profile={profile} formId="billing-customer-form" showActions={false} initialValues={customerPrefill} onSaved={handleCustomerSaved} onCancel={() => setShowCustomerModal(false)} onSelectExisting={customer => { setSelectedCustomer(customer); setSearchQuery(''); setSearchResults([]); setNoCustomerFound(false); setShowCustomerModal(false); }} onBusyChange={setCustomerSaving} />
+      </ResponsiveFormModal>}
     </div>
   );
 }

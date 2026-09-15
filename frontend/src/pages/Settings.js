@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
 import { normalizeMobile, isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
+import { showToast, showConfirmation } from '../services/notificationService';
+import { backendAPI } from '../utils/backend';
 
 const API_URL = process.env.REACT_APP_API_URL ?? '';
 
@@ -32,9 +33,9 @@ function Settings() {
     billFooter: 'Thank you for shopping with us!',
     whatsappNumber: '', whatsappMessage: '',
     showTaxOnBill: true, showGstOnBill: false,
+    allowBillingWithoutCustomer: false,
   });
   const [saved, setSaved] = useState(false);
-  const [deleteMsg, setDeleteMsg] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pincodeStatus, setPincodeStatus] = useState('');
@@ -144,32 +145,32 @@ function Settings() {
   const handleSave = async () => {
     // ---- validation ----
     if (!form.businessName || form.businessName.trim().length < 2) {
-      return alert('Business name is required (at least 2 characters).');
+      return showToast({ type: 'warning', message: 'Business name is required (at least 2 characters).' });
     }
     if (form.phone && !isValidMobile(form.phone)) {
-      return alert('Phone number: enter a valid 10-digit Indian mobile (e.g. 9876543210), or leave it empty.');
+      return showToast({ type: 'warning', message: 'Enter a valid 10-digit phone number, or leave it empty.' });
     }
     if (form.whatsappNumber && !isValidMobile(form.whatsappNumber)) {
-      return alert('WhatsApp number: enter a valid 10-digit Indian mobile with country code (e.g. +919876543210), or leave it empty.');
+      return showToast({ type: 'warning', message: 'Enter a valid WhatsApp number, or leave it empty.' });
     }
     if (!isValidEmail(form.email)) {
-      return alert('Please enter a valid email address.');
+      return showToast({ type: 'warning', message: 'Please enter a valid email address.' });
     }
     if (!isValidPincode(form.pincode)) {
-      return alert('Pincode must be a valid 6-digit Indian pincode (e.g. 560001).');
+      return showToast({ type: 'warning', message: 'Pincode must be a valid 6-digit Indian pincode.' });
     }
     if (!isValidGst(form.gstNumber)) {
-      return alert('GST number format is invalid. Expected 15 characters like 22AAAAA0000A1Z5, or leave it empty.');
+      return showToast({ type: 'warning', message: 'GST number format is invalid.' });
     }
     const tax = parseFloat(form.defaultTax);
     if (isNaN(tax) || tax < 0 || tax > 100) {
-      return alert('Default tax rate must be between 0 and 100.');
+      return showToast({ type: 'warning', message: 'Default tax rate must be between 0 and 100.' });
     }
     if (form.billPrefix && !/^[A-Za-z0-9-]{1,10}$/.test(form.billPrefix.trim())) {
-      return alert('Bill prefix must be 1-10 letters/numbers/dashes (e.g. BILL).');
+      return showToast({ type: 'warning', message: 'Bill prefix must be 1–10 letters, numbers, or dashes.' });
     }
     if (form.customerPrefix && !/^[A-Za-z0-9-]{1,10}$/.test(form.customerPrefix.trim())) {
-      return alert('Customer prefix must be 1-10 letters/numbers/dashes (e.g. CUST).');
+      return showToast({ type: 'warning', message: 'Customer prefix must be 1–10 letters, numbers, or dashes.' });
     }
 
     setSaving(true);
@@ -183,52 +184,31 @@ function Settings() {
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      showToast({ type: 'success', message: 'Settings saved successfully.' });
     } catch (e) {
-      alert('Error saving settings');
+      showToast({ type: 'error', message: 'Unable to save settings. Please try again.' });
     }
     setSaving(false);
   };
 
   const handleRequestDeletion = async () => {
-    if (!window.confirm('Request account deletion? This sends a request to support. Your account and data are deleted only after admin approval.')) {
-      return;
-    }
-    const uid = user && user.uid;
-    if (!uid) {
-      alert('Could not submit deletion request: you are not signed in.');
-      return;
-    }
-    try {
-      // Already requested? Do not create a second row.
-      const { data: existing, error: checkErr } = await supabase
-        .from('delete_requests')
-        .select('id')
-        .eq('user_id', uid)
-        .eq('status', 'pending')
-        .maybeSingle();
-      if (checkErr) throw checkErr;
-      if (existing) {
-        setDeleteMsg('You already have a pending deletion request. Support will contact you.');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('delete_requests')
-        .insert({ user_id: uid, status: 'pending' });
-      if (error) {
-        // 23505 = unique_violation: a pending request exists (race with another tab)
-        if (error.code === '23505') {
-          setDeleteMsg('You already have a pending deletion request. Support will contact you.');
-          return;
+    await showConfirmation({
+      title: 'Delete this account?',
+      message: 'This will permanently remove the business account and its associated data.',
+      confirmText: 'Delete Account',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          const result = await backendAPI.deleteAccount();
+          if (result === null) throw new Error('Account deletion service unavailable');
+          showToast({ type: 'success', message: 'Account deleted successfully.' });
+          await logout();
+        } catch (err) {
+          console.error('[handleAccountDeletion] error:', err);
+          showToast({ type: 'error', message: 'Unable to delete the account. Please try again.' });
         }
-        throw error;
-      }
-
-      setDeleteMsg('Deletion request submitted. Support will review it and delete your account.');
-    } catch (err) {
-      console.error('[handleRequestDeletion] error:', err);
-      alert('Could not submit deletion request: ' + err.message);
-    }
+      },
+    });
   };
 
   if (loading) return <div className="loading"><i className="fas fa-spinner fa-spin"></i> Loading...</div>;
@@ -363,6 +343,11 @@ function Settings() {
         </div>
         <div className="settings-toggles">
           <label className="settings-toggle">
+            <input type="checkbox" checked={form.allowBillingWithoutCustomer === true} onChange={e => set('allowBillingWithoutCustomer', e.target.checked)} />
+            <span className="toggle-track"><span className="toggle-thumb"></span></span>
+            <span className="toggle-label">Allow billing without a customer</span>
+          </label>
+          <label className="settings-toggle">
             <input type="checkbox" checked={form.showTaxOnBill} onChange={e => set('showTaxOnBill', e.target.checked)} />
             <span className="toggle-track"><span className="toggle-thumb"></span></span>
             <span className="toggle-label">Show tax breakdown on bill</span>
@@ -413,14 +398,13 @@ function Settings() {
           </div>
           <div className="danger-zone-row">
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Request account deletion</div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>Ask support to permanently remove your account and all data</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Delete Account</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>Permanently remove this business account and its associated data</div>
             </div>
             <button className="btn btn-ghost" onClick={handleRequestDeletion}
               style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
-              <i className="fas fa-trash"></i> Request deletion
+              <i className="fas fa-trash"></i> Delete Account
             </button>
-            {deleteMsg ? (<div style={{ fontSize: 12, marginTop: 6, color: 'var(--color-text-muted)' }}>{deleteMsg}</div>) : null}
           </div>
         </div>
       </SECTION>

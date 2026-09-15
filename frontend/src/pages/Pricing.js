@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { saveSubscription, isPro } from '../utils/subscription';
 import axios from 'axios';
+import { showToast } from '../services/notificationService';
 
 // When deployed to Vercel the backend runs as serverless functions on the
 // SAME origin (see /vercel.json routes), so an empty API_URL = relative
@@ -67,7 +68,7 @@ function Pricing() {
           if (verifyRes.data.success) {
             await saveSubscription(user.uid, verifyRes.data.subscription);
             await refreshSubscription();
-            alert('Welcome to Pro! Enjoy unlimited access.');
+            showToast({ type: 'success', message: 'Welcome to Pro. Your subscription is active.' });
           }
         },
         modal: { ondismiss: () => setLoading(null) }
@@ -78,7 +79,7 @@ function Pricing() {
       rzp.open();
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Payment failed. Please try again.';
-      alert(`Payment failed: ${message}`);
+      showToast({ type: 'error', message: message.startsWith('Payment failed') ? message : `Payment failed: ${message}` });
     }
     setLoading(null);
   };

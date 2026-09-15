@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { customerAPI, billAPI } from '../utils/firestoreAPI';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime, formatDate } from '../utils/dateFormat';
-import { normalizeMobile, isValidMobile, isValidName, isValidDob } from '../utils/validation';
+import { showToast, showConfirmation } from '../services/notificationService';
+import CustomerForm from '../components/CustomerForm';
+import ResponsiveFormModal from '../components/ui/ResponsiveFormModal';
 
 function Customers() {
   const { user, profile } = useAuth();
@@ -15,7 +17,7 @@ function Customers() {
   const [customerHistory, setCustomerHistory] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedBill, setSelectedBill] = useState(null);
-  const [formData, setFormData] = useState({ name: '', mobile: '', dob: '', gender: '', address: '', notes: '' });
+  const [customerSaving, setCustomerSaving] = useState(false);
 
   useEffect(() => { loadCustomers(); }, []); // eslint-disable-line
 
@@ -28,13 +30,11 @@ function Customers() {
 
   const openAddModal = () => {
     setEditingCustomer(null);
-    setFormData({ name: '', mobile: '', dob: '', gender: '', address: '', notes: '' });
     setShowModal(true);
   };
 
   const openEditModal = (c) => {
     setEditingCustomer(c);
-    setFormData({ name: c.name, mobile: c.mobile, dob: c.dob || '', gender: c.gender || '', address: c.address || '', notes: c.notes || '' });
     setShowModal(true);
   };
 
@@ -50,51 +50,29 @@ function Customers() {
     setShowBillDetailModal(true);
   };
 
-  const handleSubmit = async () => {
-    // ---- validation ----
-    if (!isValidName(formData.name)) {
-      return alert('Please enter a valid name (2–60 characters).');
-    }
-    if (!formData.mobile || !isValidMobile(formData.mobile)) {
-      return alert('Please enter a valid 10-digit mobile number starting with 6-9 (e.g. 9876543210).');
-    }
-    if (!isValidDob(formData.dob)) {
-      return alert('Date of birth cannot be in the future.');
-    }
-    const payload = { ...formData, mobile: normalizeMobile(formData.mobile) };
-    try {
-      if (editingCustomer) await customerAPI.update(user.uid, editingCustomer.id, payload);
-      else await customerAPI.create(
-        user.uid, payload, { customerPrefix: profile?.customerPrefix }
-      );
-      setShowModal(false);
-      loadCustomers();
-    } catch (e) {
-      console.error('Save customer failed:', e);
-      alert(`Error saving customer${e?.message ? ` — ${e.message}` : ''}`);
-    }
+  const handleCustomerSaved = () => {
+    setShowModal(false);
+    loadCustomers();
+    showToast({ type: 'success', message: editingCustomer ? 'Customer updated successfully.' : 'Customer added successfully.' });
   };
 
   const deleteCustomer = async (id) => {
-    if (!window.confirm('Delete this customer?')) return;
-    await customerAPI.delete(user.uid, id);
-    loadCustomers();
+    await showConfirmation({
+      title: 'Delete this customer?',
+      message: 'The customer and associated record will be permanently removed.',
+      confirmText: 'Delete Customer',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await customerAPI.delete(user.uid, id);
+          loadCustomers();
+          showToast({ type: 'success', message: 'Customer deleted successfully.' });
+        } catch {
+          showToast({ type: 'error', message: 'Unable to delete the customer. Please try again.' });
+        }
+      },
+    });
   };
-
-  const field = (key) => (
-    <div className="form-group" key={key}>
-      <label>{key === 'dob' ? 'Date of Birth' : key === 'mobile' ? 'Mobile Number' : key.charAt(0).toUpperCase() + key.slice(1)}{['name','mobile'].includes(key) ? ' *' : ''}</label>
-      {['address','notes'].includes(key)
-        ? <textarea value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />
-        : key === 'mobile'
-        ? <input type="tel" inputMode="numeric" maxLength={12} placeholder="10-digit mobile"
-            value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value.replace(/[^0-9+ ]/g, '') })} />
-        : key === 'dob'
-        ? <input type="date" max={new Date().toISOString().slice(0, 10)}
-            value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />
-        : <input type="text" maxLength={60} value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} />}
-    </div>
-  );
 
   return (
     <div>
@@ -141,31 +119,9 @@ function Customers() {
         ))}
       </div>
 
-      {showModal && (
-        <div className="modal">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>{editingCustomer ? 'Edit Customer' : 'Add Customer'}</h2>
-              <button className="close-btn" onClick={() => setShowModal(false)}>×</button>
-            </div>
-            {['name', 'mobile', 'address', 'notes'].map(field)}
-            <div className="form-group">
-              <label>Date of Birth</label>
-              <input type="date" value={formData.dob} onChange={e => setFormData({ ...formData, dob: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Gender</label>
-              <select value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })}>
-                <option value="">Select</option>
-                <option>Male</option><option>Female</option><option>Other</option>
-              </select>
-            </div>
-            <button className="btn btn-primary" onClick={handleSubmit}>
-              {editingCustomer ? 'Update' : 'Add'} Customer
-            </button>
-          </div>
-        </div>
-      )}
+      {showModal && <ResponsiveFormModal title={editingCustomer ? 'Edit Customer' : 'Add Customer'} labelledBy="customer-form-title" onClose={() => setShowModal(false)} footer={<><button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} disabled={customerSaving}>Cancel</button><button type="submit" form="customer-form" className="btn btn-primary" disabled={customerSaving}><i className={`fas ${customerSaving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i> {customerSaving ? 'Saving...' : editingCustomer ? 'Save Changes' : 'Add Customer'}</button></>}>
+        <CustomerForm user={user} profile={profile} formId="customer-form" showActions={false} editingCustomer={editingCustomer} initialValues={editingCustomer || undefined} onSaved={handleCustomerSaved} onCancel={() => setShowModal(false)} onBusyChange={setCustomerSaving} />
+      </ResponsiveFormModal>}
 
       {showHistoryModal && selectedCustomer && (
         <div className="modal">

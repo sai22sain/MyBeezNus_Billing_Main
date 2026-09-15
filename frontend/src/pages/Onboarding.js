@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
 import { normalizeMobile, isValidMobile, isValidName, isValidPincode } from '../utils/validation';
 import Logo from '../components/Logo';
+import { showToast } from '../services/notificationService';
 
 const BUSINESS_TYPES = [
   { id: 'salon',      label: 'Salon / Spa',      icon: 'fa-scissors' },
@@ -146,9 +147,9 @@ function Onboarding() {
 
   const handleFinish = async () => {
     // ---- validation (defence in depth; step 1 already gated) ----
-    if (!isValidName(businessData.businessName)) { alert('Business name must be 2-60 characters.'); setStep(1); return; }
-    if (!isValidName(businessData.ownerName)) { alert('Owner name must be 2-60 characters.'); setStep(1); return; }
-    if (!isValidMobile(businessData.phone)) { alert('Enter a valid 10-digit mobile number starting with 6-9.'); setStep(1); return; }
+    if (!isValidName(businessData.businessName)) { showToast({ type: 'warning', message: 'Business name must be 2–60 characters.' }); setStep(1); return; }
+    if (!isValidName(businessData.ownerName)) { showToast({ type: 'warning', message: 'Owner name must be 2–60 characters.' }); setStep(1); return; }
+    if (!isValidMobile(businessData.phone)) { showToast({ type: 'warning', message: 'Enter a valid 10-digit mobile number starting with 6-9.' }); setStep(1); return; }
     setLoading(true);
     try {
       const uid = user.uid;
@@ -189,6 +190,7 @@ function Onboarding() {
       }
     } catch (err) {
       console.error('Onboarding error:', err);
+      showToast({ type: 'error', message: 'Unable to finish setup. Please try again.' });
     }
     setLoading(false);
   };

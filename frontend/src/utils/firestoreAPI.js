@@ -73,6 +73,16 @@ export const customerAPI = {
     if (error) throw error;
     return (data || []).map(toCustomer);
   },
+  findByMobile: async (uid, mobile) => {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('user_id', uid)
+      .eq('mobile', mobile)
+      .limit(1);
+    if (error) throw error;
+    return toCustomer(data?.[0]);
+  },
   getById: async (uid, id) => {
     const { data, error } = await supabase
       .from('customers')

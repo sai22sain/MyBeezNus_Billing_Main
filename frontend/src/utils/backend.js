@@ -58,6 +58,7 @@ export const backendAPI = {
   nextCustomerNumber: (prefix) => callBackend('POST', '/api/numbers/next-customer', { prefix }),
   exportRevenue: (startDate, endDate) =>
     callBackend('GET', `/api/reports/export?startDate=${startDate}&endDate=${endDate}`),
+  deleteAccount: () => callBackend('DELETE', '/api/account'),
 };
 
 export default backendAPI;

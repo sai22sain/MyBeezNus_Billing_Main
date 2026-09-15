@@ -28,6 +28,7 @@ const toProfile = (r) => r && {
   whatsappMessage: r.whatsapp_message,
   showTaxOnBill: r.show_tax_on_bill,
   showGstOnBill: r.show_gst_on_bill,
+  allowBillingWithoutCustomer: r.allow_billing_without_customer === true,
 };
 
 const toDbProfile = (uid, p) => ({
@@ -52,6 +53,7 @@ const toDbProfile = (uid, p) => ({
   whatsapp_message: p.whatsappMessage || '',
   show_tax_on_bill: p.showTaxOnBill !== false,
   show_gst_on_bill: p.showGstOnBill === true,
+  allow_billing_without_customer: p.allowBillingWithoutCustomer === true,
   updated_at: new Date().toISOString(),
 });
 

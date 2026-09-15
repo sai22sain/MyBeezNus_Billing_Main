@@ -12,6 +12,8 @@ import Reports from './pages/Reports';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
 import Logo from './components/Logo';
+import HiveBackground from './components/ui/HiveBackground';
+import ToastContainer from './components/Toast/ToastContainer';
 import './App.css';
 
 const themes = {
@@ -41,6 +43,7 @@ const navItems = [
   { to: '/items', icon: 'fa-box', label: 'Items' },
   { to: '/reports', icon: 'fa-chart-bar', label: 'Reports' },
   { to: '/pricing', icon: 'fa-crown', label: 'Upgrade' },
+  { to: '/support', icon: 'fa-headset', label: 'Tickets' },
   { to: '/settings', icon: 'fa-cog', label: 'Settings' },
 ];
 
@@ -61,6 +64,7 @@ function AppShell() {
 
   return (
     <div className="app">
+      <HiveBackground />
       {/* Sidebar — desktop */}
       <nav className="sidebar">
         <div className="sidebar-header">
@@ -176,6 +180,7 @@ function App() {
     <AuthProvider>
       <Router>
         <AppShell />
+        <ToastContainer />
       </Router>
     </AuthProvider>
   );

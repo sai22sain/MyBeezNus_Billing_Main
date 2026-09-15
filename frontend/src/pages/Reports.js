@@ -3,6 +3,7 @@ import { reportAPI } from '../utils/firestoreAPI';
 import { useAuth } from '../context/AuthContext';
 import { backendAPI } from '../utils/backend';
 import { formatDateTime } from '../utils/dateFormat';
+import { showToast } from '../services/notificationService';
 
 const rankColors = ['#f59e0b', '#94a3b8', '#b45309', '#6366f1', '#22c55e'];
 
@@ -37,7 +38,7 @@ function Reports() {
 
   const handleExport = async () => {
     if (!exportStartDate || !exportEndDate) {
-      return alert('Please select both start and end dates');
+      return showToast({ type: 'warning', message: 'Please select both start and end dates.' });
     }
     setExporting(true);
     try {
@@ -53,8 +54,9 @@ function Reports() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      showToast({ type: 'success', message: 'Report downloaded successfully.' });
     } catch (e) {
-      alert('Export coming soon! (Backend export endpoint not deployed yet)');
+      showToast({ type: 'error', message: 'Unable to export the report right now. Please try again.' });
     }
     setExporting(false);
   };

@@ -4,6 +4,9 @@ import { useCachedQuery } from '../hooks/useCachedQuery';
 import { CACHE_TTL } from '../utils/core/cache';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime } from '../utils/dateFormat';
+import { showToast, showConfirmation } from '../services/notificationService';
+import { buildBillMessage, openWhatsApp } from '../utils/whatsapp';
+import { isValidMobile } from '../utils/validation';
 
 function Bills() {
   const { user } = useAuth();
@@ -59,25 +62,45 @@ function Bills() {
   };
 
   const updateBill = async () => {
-    const totals = calculateTotals();
-    await billAPI.update(user.uid, editingBill.id, {
-      items: billItems, discount, paymentMode,
-      totalAmount: totals.subtotal, tax: totals.tax, finalAmount: totals.finalTotal
-    });
-    setShowEditModal(false);
-    loadBills();
+    try {
+      const totals = calculateTotals();
+      await billAPI.update(user.uid, editingBill.id, {
+        items: billItems, discount, paymentMode,
+        totalAmount: totals.subtotal, tax: totals.tax, finalAmount: totals.finalTotal
+      });
+      setShowEditModal(false);
+      loadBills();
+      showToast({ type: 'success', message: 'Bill updated successfully.' });
+    } catch {
+      showToast({ type: 'error', message: 'Unable to update the bill. Please try again.' });
+    }
   };
 
   const deleteBill = async (id) => {
-    if (!window.confirm('Delete this bill?')) return;
-    await billAPI.delete(user.uid, id);
-    loadBills();
+    await showConfirmation({
+      title: 'Delete this bill?',
+      message: 'This bill will be permanently removed. This action cannot be undone.',
+      confirmText: 'Delete Bill',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await billAPI.delete(user.uid, id);
+          loadBills();
+          showToast({ type: 'success', message: 'Bill deleted successfully.' });
+        } catch {
+          showToast({ type: 'error', message: 'Unable to delete the bill. Please try again.' });
+        }
+      },
+    });
   };
 
   const resendWhatsApp = (bill) => {
-    const msg = `Hello ${bill.customerName},\n\nThank you for visiting!\n\nBill No: ${bill.billNumber}\nTotal: ₹${bill.finalAmount?.toFixed(2)}\nPayment: ${bill.paymentMode}\n\nItems:\n${(bill.items || []).map(i => `- ${i.name} x${i.quantity} = ₹${(i.price * i.quantity).toFixed(2)}`).join('\n')}\n\nThank you!`;
-    const phone = bill.customerMobile?.replace(/[^0-9]/g, '');
-    window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+    if (!isValidMobile(bill.customerMobile)) {
+      return showToast({ type: 'warning', message: "This customer doesn't have a valid WhatsApp number." });
+    }
+    const msg = buildBillMessage({ billNumber: bill.billNumber, customerName: bill.customerName, total: bill.finalAmount, paymentMode: bill.paymentMode, items: bill.items });
+    if (openWhatsApp(bill.customerMobile, msg)) showToast({ type: 'info', message: 'WhatsApp opened with the bill ready to send.' });
+    else showToast({ type: 'warning', message: "WhatsApp isn't available on this device." });
   };
 
   const filteredBills = bills.filter(bill => {

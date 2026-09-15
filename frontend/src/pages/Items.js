@@ -3,6 +3,8 @@ import { itemAPI, cacheKeys, invalidateReferenceCache } from '../utils/firestore
 import { useCachedQuery } from '../hooks/useCachedQuery';
 import { CACHE_TTL } from '../utils/core/cache';
 import { useAuth } from '../context/AuthContext';
+import { showToast, showConfirmation } from '../services/notificationService';
+import ResponsiveFormModal from '../components/ui/ResponsiveFormModal';
 
 function Items() {
   const { user } = useAuth();
@@ -24,6 +26,7 @@ function Items() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', tax: 0, isActive: true });
+  const [itemSaving, setItemSaving] = useState(false);
 
   useEffect(() => { loadData(); }, []); // eslint-disable-line
 
@@ -47,13 +50,17 @@ function Items() {
   };
 
   const handleSubmit = async () => {
+    if (itemSaving) return;
+    setItemSaving(true);
     try {
       if (editingItem) await itemAPI.update(user.uid, editingItem.id, formData);
       else await itemAPI.create(user.uid, formData);
       invalidateReferenceCache(user.uid);
       setShowModal(false);
       loadData();
-    } catch { alert('Error saving item'); }
+      showToast({ type: 'success', message: editingItem ? 'Item updated successfully.' : 'Item added successfully.' });
+    } catch { showToast({ type: 'error', message: 'Unable to save the item. Please try again.' }); }
+    finally { setItemSaving(false); }
   };
 
   const toggleStatus = async (item) => { await itemAPI.toggleStatus(user.uid, item.id, item.isActive); invalidateReferenceCache(user.uid); loadData(); };
@@ -68,17 +75,41 @@ function Items() {
   };
 
   const deleteCategory = async (id) => {
-    if (!window.confirm('Delete this category?')) return;
-    await itemAPI.deleteCategory(user.uid, id);
-    invalidateReferenceCache(user.uid);
-    loadData();
+    await showConfirmation({
+      title: 'Delete this category?',
+      message: 'This category will be permanently removed.',
+      confirmText: 'Delete Category',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await itemAPI.deleteCategory(user.uid, id);
+          invalidateReferenceCache(user.uid);
+          loadData();
+          showToast({ type: 'success', message: 'Category deleted successfully.' });
+        } catch {
+          showToast({ type: 'error', message: 'Unable to delete the category. Please try again.' });
+        }
+      },
+    });
   };
 
   const deleteItem = async (id) => {
-    if (!window.confirm('Delete this item?')) return;
-    await itemAPI.delete(user.uid, id);
-    invalidateReferenceCache(user.uid);
-    loadData();
+    await showConfirmation({
+      title: 'Delete this item?',
+      message: 'This item will be permanently removed from your catalogue.',
+      confirmText: 'Delete Item',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await itemAPI.delete(user.uid, id);
+          invalidateReferenceCache(user.uid);
+          loadData();
+          showToast({ type: 'success', message: 'Item deleted successfully.' });
+        } catch {
+          showToast({ type: 'error', message: 'Unable to delete the item. Please try again.' });
+        }
+      },
+    });
   };
 
   const filteredItems = items.filter(item =>
@@ -153,13 +184,7 @@ function Items() {
         )}
       </div>
 
-      {showModal && (
-        <div className="modal">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>{editingItem ? 'Edit Item' : 'Add Item'}</h2>
-              <button className="close-btn" onClick={() => setShowModal(false)}>×</button>
-            </div>
+      {showModal && <ResponsiveFormModal title={editingItem ? 'Edit Item' : 'Add Item'} labelledBy="item-form-title" onClose={() => setShowModal(false)} footer={<><button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} disabled={itemSaving}>Cancel</button><button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={itemSaving}><i className={`fas ${itemSaving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i> {itemSaving ? 'Saving...' : editingItem ? 'Save Changes' : 'Add Item'}</button></>}>
             <div className="form-group">
               <label>Item Name *</label>
               <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
@@ -181,12 +206,7 @@ function Items() {
                 <input type="number" value={formData.tax} onChange={e => setFormData({ ...formData, tax: parseFloat(e.target.value) || 0 })} />
               </div>
             </div>
-            <button className="btn btn-primary" onClick={handleSubmit}>
-              {editingItem ? 'Update' : 'Add'} Item
-            </button>
-          </div>
-        </div>
-      )}
+      </ResponsiveFormModal>}
 
       {showCategoryModal && (
         <div className="modal">
