@@ -5,10 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../utils/dateFormat';
 
 const quickActions = [
-  { label: 'New Bill', sub: 'Create invoice', icon: 'fa-plus-circle', path: '/new-bill', color: '#6366f1' },
-  { label: 'Add Customer', sub: 'Register new', icon: 'fa-user-plus', path: '/customers', color: '#22c55e' },
-  { label: 'View Bills', sub: 'Browse history', icon: 'fa-receipt', path: '/bills', color: '#8b5cf6' },
-  { label: 'Items', sub: 'Manage catalog', icon: 'fa-box', path: '/items', color: '#f59e0b' },
+  { label: 'New Bill', sub: 'Create invoice', icon: 'fa-plus-circle', path: '/new-bill' },
+  { label: 'Add Customer', sub: 'Register new', icon: 'fa-user-plus', path: '/customers' },
+  { label: 'View Bills', sub: 'Browse history', icon: 'fa-receipt', path: '/bills' },
+  { label: 'Items', sub: 'Manage catalog', icon: 'fa-box', path: '/items' },
 ];
 
 function Dashboard() {
@@ -36,15 +36,15 @@ function Dashboard() {
   if (!stats) return <div className="loading"><i className="fas fa-spinner fa-spin"></i> Loading...</div>;
 
   const statCards = [
-    { label: "Today's Bills", value: stats.today_bills, icon: 'fa-file-invoice', color: '#6366f1' },
-    { label: "Today's Revenue", value: showRevenue ? `₹${stats.today_revenue?.toFixed(0) || 0}` : '₹ ••••', icon: 'fa-indian-rupee-sign', color: '#22c55e' },
-    { label: 'Month Revenue', value: showRevenue ? `₹${stats.month_revenue?.toFixed(0) || 0}` : '₹ ••••', icon: 'fa-calendar-alt', color: '#8b5cf6' },
-    { label: 'Total Customers', value: stats.total_customers, icon: 'fa-users', color: '#ef4444' },
-    { label: 'Active Items', value: stats.active_items, icon: 'fa-boxes-stacked', color: '#f59e0b' },
+    { label: "Today's Bills", value: stats.today_bills, icon: 'fa-file-invoice' },
+    { label: "Today's Revenue", value: showRevenue ? `₹${stats.today_revenue?.toFixed(0) || 0}` : '₹ ••••', icon: 'fa-indian-rupee-sign' },
+    { label: 'Month Revenue', value: showRevenue ? `₹${stats.month_revenue?.toFixed(0) || 0}` : '₹ ••••', icon: 'fa-calendar-alt' },
+    { label: 'Total Customers', value: stats.total_customers, icon: 'fa-users' },
+    { label: 'Active Items', value: stats.active_items, icon: 'fa-boxes-stacked' },
   ];
 
   return (
-    <div>
+    <div className="dashboard-page">
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
@@ -61,8 +61,7 @@ function Dashboard() {
       {/* Quick Actions */}
       <div className="dash-quick-actions">
         {quickActions.map(a => (
-          <button key={a.path} className="quick-action-card" onClick={() => navigate(a.path)}
-            style={{ '--qa-color': a.color }}>
+          <button key={a.path} className="quick-action-card" onClick={() => navigate(a.path)}>
             <i className={`fas ${a.icon} quick-action-icon`}></i>
             <div className="quick-action-label">{a.label}</div>
             <div className="quick-action-sub">{a.sub}</div>
@@ -74,7 +73,7 @@ function Dashboard() {
       <div className="dash-stats">
         {statCards.map(s => (
           <div key={s.label} className="dash-stat-card">
-            <div className="dash-stat-icon" style={{ background: s.color }}>
+            <div className="dash-stat-icon">
               <i className={`fas ${s.icon}`}></i>
             </div>
             <div>

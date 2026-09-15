@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
-import { normalizeMobile, isValidMobile, isValidName } from '../utils/validation';
+import { normalizeMobile, isValidMobile, isValidName, isValidPincode } from '../utils/validation';
+import Logo from '../components/Logo';
 
 const BUSINESS_TYPES = [
   { id: 'salon',      label: 'Salon / Spa',      icon: 'fa-scissors' },
@@ -93,8 +94,45 @@ function Onboarding() {
     ownerName: user?.displayName || '',
     phone: '',
     address: '',
+    area: '',
     city: '',
+    state: '',
+    pincode: '',
   });
+  const [pincodeStatus, setPincodeStatus] = useState('');
+
+  useEffect(() => {
+    const pincode = businessData.pincode.trim();
+    if (!isValidPincode(pincode) || pincode.length !== 6) {
+      setPincodeStatus('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setPincodeStatus('Looking up location...');
+
+    fetch(`https://api.postalpincode.in/pincode/${pincode}`, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error('Pincode lookup failed');
+        return response.json();
+      })
+      .then(result => {
+        const office = result?.[0]?.PostOffice?.[0];
+        if (!office) throw new Error('Pincode not found');
+        setBusinessData(previous => ({
+          ...previous,
+          area: office.Name || '',
+          city: office.District || office.Block || '',
+          state: office.State || '',
+        }));
+        setPincodeStatus('Location found. You can edit these details if needed.');
+      })
+      .catch(error => {
+        if (error.name !== 'AbortError') setPincodeStatus('Location not found. Enter the details manually.');
+      });
+
+    return () => controller.abort();
+  }, [businessData.pincode]);
 
   const handleNext = () => setStep(step + 1);
   const handleBack = () => setStep(step - 1);
@@ -103,6 +141,8 @@ function Onboarding() {
   const step1Valid = isValidName(businessData.businessName)
     && isValidName(businessData.ownerName)
     && isValidMobile(businessData.phone);
+  const locationValid = isValidPincode(businessData.pincode)
+    && businessData.pincode.trim().length === 6;
 
   const handleFinish = async () => {
     // ---- validation (defence in depth; step 1 already gated) ----
@@ -165,15 +205,15 @@ function Onboarding() {
   };
 
   return (
-    <div style={{
+    <div className="onboarding-shell" style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: '#ffffff',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
+      alignItems: 'stretch',
+      justifyContent: 'flex-start',
+      padding: 0
     }}>
-      <div style={{
+      <div className="onboarding-card" style={{
         background: 'white',
         borderRadius: '24px',
         padding: '50px 40px',
@@ -181,57 +221,43 @@ function Onboarding() {
         maxWidth: '480px',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
       }}>
+        <div className="onboarding-brand-row">
+          <Logo size={36} radius={0} />
+          <span>MyBeezNus Billing</span>
+        </div>
+        <div className="onboarding-progress-label">Step {step} of 4</div>
         {/* Progress */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '35px' }}>
+        <div className="onboarding-progress" style={{ display: 'flex', gap: '8px', marginBottom: '35px' }}>
           {[1, 2, 3, 4].map(s => (
             <div key={s} style={{
               flex: 1,
               height: '5px',
               borderRadius: '3px',
-              background: s <= step ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e0e0e0',
+              background: s <= step ? '#169447' : '#e5ece8',
               transition: 'background 0.3s'
             }} />
           ))}
         </div>
 
-        {/* Step 1: Business type */}
+        {/* Step 1: Business type question */}
         {step === 1 && (
           <div>
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-              <div style={{
-                width: '70px', height: '70px', borderRadius: '18px',
-                background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 20px'
-              }}>
-                <i className="fas fa-store" style={{ fontSize: '30px', color: 'white' }}></i>
-              </div>
-              <h2 style={{ fontSize: '26px', fontWeight: '700', color: '#2c3e50', marginBottom: '8px' }}>
-                Welcome, {user?.displayName?.split(' ')[0]}! 👋
-              </h2>
-              <p style={{ color: '#666', fontSize: '15px' }}>
-                What kind of business do you run?
-              </p>
+            <div className="onboarding-question-heading">
+              <p>Welcome aboard, {user?.displayName || 'business owner'}!</p>
+              <h2>What kind of business do you run?</h2>
+              <span>We&apos;ll personalize your categories, items, and billing workflow.</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {BUSINESS_TYPES.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setBusinessType(t.id)}
-                  style={{
-                    padding: '14px 10px', borderRadius: '12px',
-                    border: businessType === t.id ? '2px solid #667eea' : '2px solid #e0e0e0',
-                    background: businessType === t.id ? '#eef2ff' : 'white',
-                    cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', gap: '8px',
-                    fontSize: '13px', fontWeight: '600',
-                    color: businessType === t.id ? '#4338ca' : '#555'
-                  }}
-                >
-                  <i className={`fas ${t.icon}`} style={{ fontSize: '22px', color: businessType === t.id ? '#667eea' : '#999' }}></i>
-                  {t.label}
-                </button>
-              ))}
+            <div className="onboarding-select-field">
+              <label htmlFor="business-type">Business type <span>*</span></label>
+              <select
+                id="business-type"
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value)}
+              >
+                {BUSINESS_TYPES.map(t => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
             </div>
             <button
               onClick={handleNext}
@@ -250,23 +276,39 @@ function Onboarding() {
         {/* Step 2: Business details */}
         {step === 2 && (
           <div>
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-              <div style={{
-                width: '70px', height: '70px', borderRadius: '18px',
-                background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 20px'
-              }}>
-                <i className="fas fa-id-card" style={{ fontSize: '30px', color: 'white' }}></i>
-              </div>
-              <h2 style={{ fontSize: '26px', fontWeight: '700', color: '#2c3e50', marginBottom: '8px' }}>
-                Business Details
-              </h2>
-              <p style={{ color: '#666', fontSize: '15px' }}>
-                Set up your business in just 2 minutes
-              </p>
+            <div className="onboarding-question-heading">
+              <p>Let&apos;s get to know you</p>
+              <h2>Tell us about your business</h2>
+              <span>This information appears on your invoices and account.</span>
             </div>
             <div style={{ display: 'grid', gap: '15px' }}>
+              <div className="onboarding-location-row">
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '6px' }}>
+                    Pincode *
+                  </label>
+                  <input
+                    style={inputStyle}
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="6-digit pincode"
+                    value={businessData.pincode}
+                    onChange={(e) => setBusinessData({ ...businessData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '6px' }}>
+                    Area / Locality
+                  </label>
+                  <input
+                    style={inputStyle}
+                    placeholder="Area or locality"
+                    value={businessData.area}
+                    onChange={(e) => setBusinessData({ ...businessData, area: e.target.value })}
+                  />
+                </div>
+              </div>
+              {pincodeStatus && <p className="onboarding-pincode-status">{pincodeStatus}</p>}
               <div>
                 <label style={{ fontSize: '14px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '6px' }}>
                   {BUSINESS_NAME_LABELS[businessType] || 'Business Name'} *
@@ -368,15 +410,26 @@ function Onboarding() {
                   onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
                 />
               </div>
-              <div>
+              <div className="onboarding-location-row">
                 <label style={{ fontSize: '14px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '6px' }}>
-                  City
+                  City / Town
                 </label>
                 <input
                   style={inputStyle}
                   placeholder="City"
                   value={businessData.city}
                   onChange={(e) => setBusinessData({ ...businessData, city: e.target.value })}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                />
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '6px' }}>
+                  State
+                </label>
+                <input
+                  style={inputStyle}
+                  placeholder="State"
+                  value={businessData.state}
+                  onChange={(e) => setBusinessData({ ...businessData, state: e.target.value })}
                   onFocus={(e) => e.target.style.borderColor = '#667eea'}
                   onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
                 />
@@ -391,11 +444,12 @@ function Onboarding() {
               }}>
                 ← Back
               </button>
-              <button onClick={handleNext} style={{
+              <button onClick={handleNext} disabled={!locationValid} style={{
                 flex: 2, padding: '14px',
                 background: 'linear-gradient(135deg, #667eea, #764ba2)',
                 color: 'white', border: 'none', borderRadius: '12px',
                 fontSize: '16px', fontWeight: '600', cursor: 'pointer'
+                , opacity: locationValid ? 1 : 0.5
               }}>
                 Next →
               </button>
@@ -470,6 +524,14 @@ function Onboarding() {
           </div>
         )}
       </div>
+      <aside className="onboarding-art" aria-hidden="true">
+        <div className="onboarding-art-glow"></div>
+        <div className="onboarding-art-copy">
+          <span>Simple tools for</span>
+          <strong>beautiful businesses.</strong>
+        </div>
+        <img src="/MyBeezNus_Header.png" alt="" />
+      </aside>
     </div>
   );
 }

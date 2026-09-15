@@ -12,17 +12,28 @@ const createOrder = async (req, res) => {
   try {
     const { plan, userId } = req.body;
     if (!PLANS[plan]) return res.status(400).json({ error: 'Invalid plan' });
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({ error: 'Payment gateway is not configured on the server' });
+    }
+
+    // Razorpay receipt max length is 56 chars — use a short, unique receipt
+    const receipt = `rcpt_${Date.now()}`.slice(0, 56);
 
     const order = await razorpay.orders.create({
       amount: PLANS[plan].amount,
       currency: PLANS[plan].currency,
-      receipt: `receipt_${userId}_${Date.now()}`,
-      notes: { userId, plan }
+      receipt,
+      notes: { userId, plan } // userId kept in notes (not length-limited)
     });
 
     res.json({ orderId: order.id, amount: order.amount, currency: order.currency, keyId: process.env.RAZORPAY_KEY_ID });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Razorpay order creation failed:', {
+      statusCode: error.statusCode,
+      error: error.error,
+      message: error.message
+    });
+    res.status(500).json({ error: error.error?.description || error.message || 'Unable to create payment order' });
   }
 };
 

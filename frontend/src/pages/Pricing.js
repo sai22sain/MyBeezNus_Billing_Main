@@ -73,8 +73,9 @@ function Pricing() {
       await loadRazorpay();
       const rzp = new window.Razorpay(options);
       rzp.open();
-    } catch {
-      alert('Payment failed. Please try again.');
+    } catch (error) {
+      const message = error.response?.data?.error || error.message || 'Payment failed. Please try again.';
+      alert(`Payment failed: ${message}`);
     }
     setLoading(null);
   };
