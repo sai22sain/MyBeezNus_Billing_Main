@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { normalizeMobile, isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const SECTION = ({ icon, title, subtitle, children }) => (
   <div className="settings-section">
     <div className="settings-section-header">
@@ -36,6 +38,12 @@ function Settings() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // ---- Support tickets (CRM) ----
+  const [ticketForm, setTicketForm] = useState({ category: 'bug', subject: '', message: '' });
+  const [myTickets, setMyTickets] = useState([]);
+  const [ticketMsg, setTicketMsg] = useState('');
+  const [ticketBusy, setTicketBusy] = useState(false);
+
   useEffect(() => {
     // Profile is loaded by AuthContext; sync it into the form
     if (profile) {
@@ -45,6 +53,59 @@ function Settings() {
   }, [profile]);
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+
+  // ---- Support ticket helpers ----
+  const authedFetch = async (method, url, body) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token || ''}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  };
+
+  const loadTickets = async () => {
+    try {
+      const r = await authedFetch('GET', `${API_URL}/api/support/mine`);
+      setMyTickets(r.tickets || []);
+    } catch {
+      /* tickets are non-critical - stay silent on failure */
+    }
+  };
+
+  const handleRaiseTicket = async () => {
+    const subject = ticketForm.subject.trim();
+    const message = ticketForm.message.trim();
+    if (subject.length < 3) return alert('Subject must be at least 3 characters.');
+    if (message.length < 5) return alert('Please describe the issue (at least 5 characters).');
+    setTicketBusy(true);
+    setTicketMsg('');
+    try {
+      await authedFetch('POST', `${API_URL}/api/support`, {
+        app: 'billing',
+        ...ticketForm,
+        subject,
+        message,
+      });
+      setTicketForm({ category: 'bug', subject: '', message: '' });
+      setTicketMsg('Ticket submitted. Our team will get back to you here.');
+      await loadTickets();
+    } catch (e) {
+      setTicketMsg('Could not submit ticket: ' + e.message);
+    } finally {
+      setTicketBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTickets();
+  }, []);
 
   const handleSave = async () => {
     // ---- validation ----
@@ -323,6 +384,71 @@ function Settings() {
             {deleteMsg ? (<div style={{ fontSize: 12, marginTop: 6, color: 'var(--color-text-muted)' }}>{deleteMsg}</div>) : null}
           </div>
         </div>
+      </SECTION>
+
+      {/* Help & Support */}
+      <SECTION icon="fa-headset" title="Help &amp; Support" subtitle="Raise a ticket — our team will get back to you">
+        <div className="form-group">
+          <label>Category</label>
+          <select value={ticketForm.category} onChange={e => setTicketForm(p => ({ ...p, category: e.target.value }))}>
+            <option value="bug">Bug / something not working</option>
+            <option value="feature">Feature request</option>
+            <option value="billing">Billing / payment issue</option>
+            <option value="account">Account issue</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Subject</label>
+          <input
+            value={ticketForm.subject}
+            maxLength={120}
+            onChange={e => setTicketForm(p => ({ ...p, subject: e.target.value }))}
+            placeholder="Short summary (e.g. Bill PDF not opening)"
+          />
+        </div>
+        <div className="form-group">
+          <label>Description</label>
+          <textarea
+            rows={4}
+            maxLength={4000}
+            value={ticketForm.message}
+            onChange={e => setTicketForm(p => ({ ...p, message: e.target.value }))}
+            placeholder="Tell us what happened, what you expected and what went wrong..."
+          />
+        </div>
+        <button className="btn btn-primary" onClick={handleRaiseTicket} disabled={ticketBusy} style={{ padding: '9px 22px' }}>
+          {ticketBusy ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Submit ticket</>}
+        </button>
+        {ticketMsg && <div style={{ fontSize: 13, marginTop: 8, color: 'var(--color-text-muted)' }}>{ticketMsg}</div>}
+
+        {myTickets.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <div className="settings-section-sub" style={{ marginBottom: 4 }}>Your recent tickets</div>
+            {myTickets.map(t => (
+              <div key={t.id} style={{ borderTop: '1px solid var(--color-border, rgba(128,128,128,.25))', padding: '10px 0', fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <strong>{t.subject}</strong>
+                  <span style={{
+                    fontWeight: 600, whiteSpace: 'nowrap',
+                    color: t.status === 'open' ? '#f59e0b'
+                      : (t.status === 'resolved' || t.status === 'closed') ? '#22c55e' : '#3b82f6',
+                  }}>
+                    {String(t.status).replace('_', ' ')}
+                  </span>
+                </div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 12, marginTop: 2 }}>
+                  {new Date(t.created_at).toLocaleString('en-IN')} &middot; {t.app}
+                </div>
+                {t.admin_reply && (
+                  <div style={{ marginTop: 6, background: 'rgba(127,127,127,.12)', padding: 8, borderRadius: 6 }}>
+                    <strong>Support:</strong> {t.admin_reply}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </SECTION>
 
       <div style={{ paddingBottom: 40 }}>

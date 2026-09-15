@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Salon Admin Dashboard</title>
+<title>MyBeezNus CRM</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -64,6 +64,11 @@
   .badge-pending { background: rgba(245,158,11,.18); color: #fcd34d; }
   .badge-approved { background: rgba(34,197,94,.18); color: #86efac; }
   .badge-rejected { background: rgba(148,163,184,.2); color: #cbd5e1; }
+  .badge-open { background: rgba(245,158,11,.18); color: #fcd34d; }
+  .badge-in_progress { background: rgba(59,130,246,.2); color: #93c5fd; }
+  .badge-resolved { background: rgba(34,197,94,.18); color: #86efac; }
+  .badge-closed { background: rgba(148,163,184,.2); color: #cbd5e1; }
+  .reply-row { background: var(--panel-2); border-radius: 7px; padding: 8px 10px; margin-top: 6px; font-size: 12px; }
   .muted { color: var(--muted); }
   .empty { color: var(--muted); padding: 18px 12px; font-style: italic; }
   .toast {
@@ -81,7 +86,7 @@
 
 <header>
   <div>
-    <h1>Salon Admin Dashboard</h1>
+    <h1>MyBeezNus CRM</h1>
     <div class="sub" id="subtitle">Loading&hellip;</div>
   </div>
   <button class="btn btn-primary" id="refreshBtn">Refresh</button>
@@ -92,6 +97,45 @@
 
   <section>
     <div class="section-head">
+      <h2>Our apps</h2>
+    </div>
+    <div class="grid" id="appsGrid">
+      <div class="card">
+        <div class="stat-label">Billing</div>
+        <div style="margin:8px 0"><span class="badge badge-approved">Live</span></div>
+        <div class="muted" style="font-size:12px">
+          GST-ready billing for salons &amp; shops.<br />
+          <strong id="appBillingUsers" style="color:var(--text)">0</strong> active businesses
+        </div>
+      </div>
+      <div class="card" style="opacity:.55">
+        <div class="stat-label">Coming soon</div>
+        <div style="margin:8px 0"><span class="badge badge-rejected">Planned</span></div>
+        <div class="muted" style="font-size:12px">Next MyBeezNus app goes here.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Support tickets</h2>
+      <span class="muted" id="ticketsCount"></span>
+    </div>
+    <div class="card" style="padding:0">
+      <table>
+        <thead>
+          <tr>
+            <th>Business</th><th>App</th><th>Subject</th><th>Category</th>
+            <th>Raised</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ticketsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
       <h2>Pending deletion requests</h2>
       <span class="muted" id="pendingCount"></span>
     </div>
@@ -99,7 +143,7 @@
       <table>
         <thead>
           <tr>
-            <th>Business</th><th>Email</th><th class="num">Bills</th><th>Requested</th><th>Status</th><th>Actions</th>
+            <th>Business</th><th>Email</th><th>Requested</th><th>Status</th><th>Actions</th>
           </tr>
         </thead>
         <tbody id="requestsBody"></tbody>
@@ -107,7 +151,7 @@
     </div>
   </section>
 
-<section>
+  <section>
     <div class="section-head">
       <h2>Users</h2>
       <input type="search" id="searchBox" placeholder="Search by business, email or phone..." />
@@ -117,8 +161,7 @@
         <thead>
           <tr>
             <th>Business</th><th>Owner</th><th>Email</th><th>Phone</th>
-            <th>Joined</th><th class="num">Bills</th>
-            <th class="num">Revenue</th><th>Actions</th>
+            <th>Joined</th><th>Actions</th>
           </tr>
         </thead>
         <tbody id="usersBody"></tbody>

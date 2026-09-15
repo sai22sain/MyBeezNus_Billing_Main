@@ -213,52 +213,28 @@ async function buildSnapshot() {
   const results = await Promise.all([
     listAuthUsers(),
     fetchAllSafe('profiles', 'user_id, business_name, owner_name, phone, email, city, created_at'),
-    fetchAllSafe('bills', 'user_id, final_amount, created_at'),
     fetchAllSafe('delete_requests', 'id, user_id, status, requested_at, reviewed_at, admin_notes'),
     fetchAllSafe('deleted_accounts',
       'id, user_id, email, business_name, bills_count, customers_count, deleted_at, deleted_by'),
+    fetchAllSafe('support_tickets',
+      'id, user_id, app, category, subject, message, status, admin_reply, created_at, updated_at'),
   ]);
 
   const authUsers = results[0];
   const profiles = results[1];
-  const bills = results[2];
-  const requests = results[3];
-  const deleted = results[4];
-
-  const today = new Date().toISOString().slice(0, 10);
-  const month = today.slice(0, 7);
-
-  let totalRevenue = 0;
-  let todayRevenue = 0;
-  let monthRevenue = 0;
-  const perUser = {};
-
-  const bucket = (uid) => {
-    if (!perUser[uid]) {
-      perUser[uid] = { bills: 0, revenue: 0 };
-    }
-    return perUser[uid];
-  };
-
-  for (const b of bills) {
-    const amount = Number(b.final_amount || 0);
-    totalRevenue += amount;
-    const day = dayKey(b.created_at);
-    if (day === today) todayRevenue += amount;
-    if (day.slice(0, 7) === month) monthRevenue += amount;
-    const bkt = bucket(b.user_id);
-    bkt.bills += 1;
-    bkt.revenue += amount;
-  }
+  const requests = results[2];
+  const deleted = results[3];
+  const tickets = results[4];
 
   const profileByUid = {};
   for (const p of profiles) profileByUid[p.user_id] = p;
 
-  /* Active = has completed onboarding (created a business profile). */
+  /* Active = has completed onboarding (created a business profile).
+     The CRM shows contact info only - never the customer's business data. */
   const users = authUsers
+    .filter((u) => profileByUid[u.id] && profileByUid[u.id].business_name)
     .map((u) => {
-      const p = profileByUid[u.id] || {};
-      const b = perUser[u.id] || { bills: 0, revenue: 0 };
+      const p = profileByUid[u.id];
       return {
         uid: u.id,
         email: u.email || p.email || '',
@@ -268,20 +244,15 @@ async function buildSnapshot() {
         city: p.city || '',
         createdAt: u.created_at || p.created_at || null,
         lastSignInAt: u.last_sign_in_at || null,
-        onboarded: Boolean(p.business_name),
-        bills: b.bills,
-        revenue: b.revenue,
       };
-    })
-    .filter((u) => u.onboarded);
+    });
 
   const stats = {
     activeUsers: users.length,
     totalSignups: authUsers.length,
-    totalBills: bills.length,
-    totalRevenue: totalRevenue,
-    todayRevenue: todayRevenue,
-    monthRevenue: monthRevenue,
+    openTickets: tickets.filter((t) => t.status === 'open').length,
+    inProgressTickets: tickets.filter((t) => t.status === 'in_progress').length,
+    resolvedTickets: tickets.filter((t) => t.status === 'resolved' || t.status === 'closed').length,
     pendingRequests: requests.filter((r) => r.status === 'pending').length,
     approvedRequests: requests.filter((r) => r.status === 'approved').length,
     rejectedRequests: requests.filter((r) => r.status === 'rejected').length,
@@ -293,6 +264,7 @@ async function buildSnapshot() {
     users: users,
     requests: requests,
     deleted: deleted,
+    tickets: tickets,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -369,7 +341,6 @@ app.get('/api/admin/requests', route(async (_req, res) => {
       adminNotes: r.admin_notes,
       email: u.email || '',
       businessName: u.businessName || '',
-      bills: u.bills || 0,
     };
   });
 
@@ -426,6 +397,37 @@ app.post('/api/admin/users/:uid/delete', route(async (req, res) => {
     notes: (req.body && req.body.notes) || null,
   });
   res.json({ message: 'Account deleted permanently', detail: detail });
+}));
+
+/* ------------------------------------------------------------------ */
+/* Support tickets (CRM)                                               */
+/* ------------------------------------------------------------------ */
+
+/** Update a ticket's status and/or leave an admin reply. */
+app.post('/api/admin/tickets/:id/update', route(async (req, res) => {
+  const body = req.body || {};
+  const ALLOWED = ['open', 'in_progress', 'resolved', 'closed'];
+  const patch = { updated_at: new Date().toISOString() };
+
+  if (body.status) {
+    if (!ALLOWED.includes(body.status)) {
+      return res.status(400).json({ error: 'Invalid status: ' + body.status });
+    }
+    patch.status = body.status;
+  }
+  if (typeof body.admin_reply === 'string') {
+    patch.admin_reply = body.admin_reply.slice(0, 4000) || null;
+  }
+  if (!body.status && typeof body.admin_reply !== 'string') {
+    return res.status(400).json({ error: 'Nothing to update (send status and/or admin_reply)' });
+  }
+
+  const { error } = await getAdmin()
+    .from('support_tickets')
+    .update(patch)
+    .eq('id', req.params.id);
+  if (error) throw error;
+  res.json({ message: 'Ticket updated' });
 }));
 
 app.use((err, _req, res, _next) => {

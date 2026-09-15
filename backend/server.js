@@ -19,6 +19,9 @@ app.use('/api/numbers', require('./src/routes/numbers'));
 app.use('/api/webhooks', require('./src/routes/webhooks'));
 app.use('/api/reports', require('./src/routes/reports'));
 
+// Support tickets (customers raise concerns from any MyBeezNus app)
+app.use('/api/support', require('./src/routes/support'));
+
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'MyBills.in API running' }));
 
 app.listen(PORT, () => console.log(`MyBills.in backend running on port ${PORT}`));
