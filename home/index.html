@@ -1,135 +1,465 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#14102e" />
-    <meta name="description" content="MyBeezNus - Simple business tools, starting with GST-ready billing." />
-    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link rel="apple-touch-icon" href="/logo.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <title>MyBeezNus - Simplified Tools</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { min-height: 100%; }
-      body {
-        font-family: 'Inter', system-ui, sans-serif;
-        position: relative;
-        overflow-x: hidden;
-        background: #0d1729;
-        color: #ffffff;
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#14102e" />
+  <meta name="description" content="MyBeezNus - Simple business tools, starting with GST-ready billing." />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="apple-touch-icon" href="/logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <title>MyBeezNus - Simplified Tools</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      position: relative;
+      overflow-x: hidden;
+      background: #0d1729;
+      color: #ffffff;
+    }
+
+    video.bg {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(13, 23, 41, 0.66), rgba(13, 23, 41, 0.95) 76%), radial-gradient(ellipse 70% 55% at 50% 35%, rgba(38, 61, 88, 0.38), rgba(13, 23, 41, 0.9) 72%);
+      z-index: 1;
+    }
+
+    .page {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px;
+    }
+
+    nav {
+      width: 100%;
+      max-width: 1120px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    nav .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 19px;
+      letter-spacing: -0.3px;
+    }
+
+    nav .brand img {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+    }
+
+    nav .cta-buy {
+      background: #f59e0b;
+      color: #172033;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    nav .cta-buy:hover {
+      background: #fbbf24;
+    }
+
+    .hero {
+      width: 100%;
+      max-width: 860px;
+      text-align: center;
+      padding: 82px 24px 54px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(245, 158, 11, 0.13);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .hero h1 {
+      font-size: 50px;
+      font-weight: 900;
+      letter-spacing: -1.2px;
+      margin-top: 22px;
+      line-height: 1.08;
+      color: #fff;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: #b8c6d9;
+      font-weight: 500;
+      margin: 20px auto 0;
+      max-width: 590px;
+      line-height: 1.6;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: center;
+      margin-top: 32px;
+    }
+
+    .btn-open {
+      background: #f59e0b;
+      color: #172033;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 26px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .15s ease, background .15s ease;
+    }
+
+    .btn-open:hover {
+      transform: translateY(-2px);
+      background: #fbbf24;
+    }
+
+    .btn-open:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-sec {
+      background: rgba(255, 255, 255, 0.12);
+      color: #e6e9ff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      padding: 14px 26px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-sec:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    #apps {
+      width: 100%;
+      max-width: 1120px;
+      padding: 12px 0 46px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    #apps h2,
+    #support h2 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .section-heading p {
+      color: #91a2b8;
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .card {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: rgba(18, 34, 55, 0.82);
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      border-radius: 12px;
+      padding: 25px;
+      backdrop-filter: blur(6px);
+      transition: transform .15s ease, border-color .15s ease;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: #f59e0b;
+    }
+
+    .card .icon {
+      flex: 0 0 54px;
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      background: #f59e0b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #172033;
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .card h3 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card p {
+      font-size: 14px;
+      color: #b8c6d9;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+
+    .card .link {
+      margin-top: 14px;
+      font-size: 14px;
+      font-weight: 800;
+      color: #fbbf24;
+    }
+
+    #support {
+      width: 100%;
+      max-width: 1120px;
+      padding: 18px 0 52px;
+    }
+
+    .support-panel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      background: rgba(18, 34, 55, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 22px 25px;
+    }
+
+    .support-copy {
+      color: #91a2b8;
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .support-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(80px, 1fr));
+      gap: 18px;
+      flex: 1;
+      max-width: 600px;
+    }
+
+    .support-stat {
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+      padding-left: 16px;
+    }
+
+    .support-stat strong {
+      display: block;
+      color: #fff;
+      font-size: 20px;
+    }
+
+    .support-stat span {
+      display: block;
+      color: #91a2b8;
+      font-size: 11px;
+      margin-top: 4px;
+    }
+
+    .support-button {
+      white-space: nowrap;
+      background: transparent;
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      border-radius: 8px;
+      padding: 11px 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .support-button:hover {
+      background: rgba(245, 158, 11, 0.12);
+    }
+
+    footer {
+      width: 100%;
+      max-width: 1120px;
+      text-align: center;
+      padding: 32px 0;
+      color: #71839a;
+      font-size: 13px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    @media (max-width: 760px) {
+      .hero h1 {
+        font-size: 36px;
       }
-      video.bg {
-        position: fixed;
-        inset: 0; width: 100%; height: 100%;
-        object-fit: cover; z-index: 0;
+
+      .hero {
+        padding: 58px 0 42px;
       }
-      .overlay {
-        position: fixed;
-        inset: 0;
-        background: linear-gradient(180deg, rgba(13,23,41,0.66), rgba(13,23,41,0.95) 76%), radial-gradient(ellipse 70% 55% at 50% 35%, rgba(38,61,88,0.38), rgba(13,23,41,0.9) 72%);
-        z-index: 1;
+
+      .hero p {
+        font-size: 16px;
       }
-      .page { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
-      nav { width: 100%; max-width: 1120px; display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.12); }
-      nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.3px; }
-      nav .brand img { width: 38px; height: 38px; border-radius: 10px; }
-      nav .cta-buy { background: #f59e0b; color: #172033; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 800; font-size: 14px; cursor: pointer; }
-      nav .cta-buy:hover { background: #fbbf24; }
-      .hero { width: 100%; max-width: 860px; text-align: center; padding: 82px 24px 54px; }
-      .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.13); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35); padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-      .hero h1 { font-size: 50px; font-weight: 900; letter-spacing: -1.2px; margin-top: 22px; line-height: 1.08; color: #fff; }
-      .hero p { font-size: 18px; color: #b8c6d9; font-weight: 500; margin: 20px auto 0; max-width: 590px; line-height: 1.6; }
-      .cta-row { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 32px; }
-      .btn-open { background: #f59e0b; color: #172033; border: none; border-radius: 8px; padding: 14px 26px; font-size: 16px; font-weight: 800; cursor: pointer; transition: transform .15s ease, background .15s ease; }
-      .btn-open:hover { transform: translateY(-2px); background: #fbbf24; }
-      .btn-open:hover { transform: translateY(-2px); }
-      .btn-sec { background: rgba(255,255,255,0.12); color: #e6e9ff; border: 1px solid rgba(255,255,255,0.25); border-radius: 12px; padding: 14px 26px; font-size: 16px; font-weight: 600; cursor: pointer; }
-      .btn-sec:hover { background: rgba(255,255,255,0.2); }
-      #apps { width: 100%; max-width: 1120px; padding: 12px 0 46px; }
-      .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 18px; }
-      #apps h2, #support h2 { font-size: 24px; font-weight: 800; color: #fff; }
-      .section-heading p { color: #91a2b8; font-size: 13px; }
-      .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
-      .card { display: flex; align-items: center; gap: 20px; background: rgba(18,34,55,0.82); border: 1px solid rgba(245,158,11,0.28); border-radius: 12px; padding: 25px; backdrop-filter: blur(6px); transition: transform .15s ease, border-color .15s ease; cursor: pointer; text-align: left; }
-      .card:hover { transform: translateY(-3px); border-color: #f59e0b; }
-      .card .icon { flex: 0 0 54px; width: 54px; height: 54px; border-radius: 12px; background: #f59e0b; display: flex; align-items: center; justify-content: center; color: #172033; font-size: 22px; font-weight: 800; }
-      .card h3 { font-size: 20px; font-weight: 700; color: #fff; }
-      .card p { font-size: 14px; color: #b8c6d9; line-height: 1.5; margin-top: 8px; }
-      .card .link { margin-top: 14px; font-size: 14px; font-weight: 800; color: #fbbf24; }
-      #support { width: 100%; max-width: 1120px; padding: 18px 0 52px; }
-      .support-panel { display: flex; align-items: center; justify-content: space-between; gap: 24px; background: rgba(18,34,55,0.68); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 22px 25px; }
-      .support-copy { color: #91a2b8; font-size: 13px; margin-top: 6px; }
-      .support-stats { display: grid; grid-template-columns: repeat(4, minmax(80px, 1fr)); gap: 18px; flex: 1; max-width: 600px; }
-      .support-stat { border-left: 1px solid rgba(255,255,255,0.12); padding-left: 16px; }
-      .support-stat strong { display: block; color: #fff; font-size: 20px; }
-      .support-stat span { display: block; color: #91a2b8; font-size: 11px; margin-top: 4px; }
-      .support-button { white-space: nowrap; background: transparent; color: #fbbf24; border: 1px solid rgba(245,158,11,0.5); border-radius: 8px; padding: 11px 16px; font-weight: 700; cursor: pointer; }
-      .support-button:hover { background: rgba(245,158,11,0.12); }
-      footer { width: 100%; max-width: 1120px; text-align: center; padding: 32px 0; color: #71839a; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.1); }
-      @media (max-width: 760px) { .hero h1 { font-size: 36px; } .hero { padding: 58px 0 42px; } .hero p { font-size: 16px; } .card { align-items: flex-start; } .support-panel { align-items: stretch; flex-direction: column; } .support-stats { max-width: none; } }
-      @media (max-width: 480px) { .page { padding: 0 18px; } nav .cta-buy { padding: 9px 12px; } .support-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 8px; } .support-stat { padding-left: 8px; } .support-stat strong { font-size: 17px; } }
-    </style>
-  </head>
+
+      .card {
+        align-items: flex-start;
+      }
+
+      .support-panel {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .support-stats {
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page {
+        padding: 0 18px;
+      }
+
+      nav .cta-buy {
+        padding: 9px 12px;
+      }
+
+      .support-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 8px;
+      }
+
+      .support-stat {
+        padding-left: 8px;
+      }
+
+      .support-stat strong {
+        font-size: 17px;
+      }
+    }
+  </style>
+</head>
+
 <body>
-    <video class="bg" autoplay muted loop playsinline aria-hidden="true">
-      <source src="/Bees_honeycomb.mp4" type="video/mp4" />
-    </video>
-    <div class="overlay"></div>
+  <video class="bg" autoplay muted loop playsinline aria-hidden="true">
+    <source src="/Bees_honeycomb.mp4" type="video/mp4" />
+  </video>
+  <div class="overlay"></div>
 
-    <div class="page">
-      <nav>
-        <div class="brand">
-          <img src="/logo.svg?v=2" alt="MyBeezNus" />
-          <span>MyBeezNus</span>
+  <div class="page">
+    <nav>
+      <div class="brand">
+        <img src="/logo.svg?v=2" alt="MyBeezNus" />
+        <span>MyBeezNus</span>
+      </div>
+      <button class="cta-buy" onclick="window.open('https://mybills.in','_blank')">Open Billing</button>
+    </nav>
+
+    <section class="hero">
+      <span class="badge">✦ Simplified Tools for Modern Business</span>
+      <h1>Everything you need to run your business, in one simple suite.</h1>
+      <p>From smart billing to customer management — MyBeezNus gives growing businesses simple, powerful tools without
+        the clutter.</p>
+      <div class="cta-row">
+        <button class="btn-open" onclick="window.open('https://mybills.in','_blank')">Start Billing Now</button>
+        <button class="btn-sec"
+          onclick="document.getElementById('support').scrollIntoView({behavior:'smooth'})">Platform Support</button>
+      </div>
+    </section>
+
+    <section id="apps">
+      <div class="section-heading">
+        <div>
+          <h2>Live application</h2>
+          <p>One focused workspace for your business operations.</p>
         </div>
-        <button class="cta-buy" onclick="window.open('https://mybills.in','_blank')">Open Billing</button>
-      </nav>
-
-      <section class="hero">
-        <span class="badge">✦ Simplified Tools for Modern Business</span>
-        <h1>Everything you need to run your business, in one simple suite.</h1>
-        <p>From smart billing to customer management — MyBeezNus gives growing businesses simple, powerful tools without the clutter.</p>
-        <div class="cta-row">
-          <button class="btn-open" onclick="window.open('https://mybills.in','_blank')">Start Billing Now</button>
-          <button class="btn-sec" onclick="document.getElementById('support').scrollIntoView({behavior:'smooth'})">Platform Support</button>
+      </div>
+      <div class="grid">
+        <div class="card" onclick="window.open('https://mybills.in','_blank')">
+          <div class="icon"><span>₹</span></div>
+          <h3>Billing</h3>
+          <p>GST-ready billing for salons and shops</p>
+          <div class="link">Open Billing →</div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="apps">
-        <div class="section-heading">
-          <div><h2>Live application</h2><p>One focused workspace for your business operations.</p></div>
+    <section id="support">
+      <div class="section-heading">
+        <div>
+          <h2>Platform Support</h2>
+          <p>Track important support activity from Billing Admin.</p>
         </div>
-        <div class="grid">
-          <div class="card" onclick="window.open('https://mybills.in','_blank')">
-            <div class="icon"><span>₹</span></div>
-            <h3>Billing</h3>
-            <p>GST-ready billing for salons and shops</p>
-            <div class="link">Open Billing →</div>
-          </div>
+      </div>
+      <div class="support-panel">
+        <div class="support-stats">
+          <div class="support-stat"><strong>0</strong><span>Open Tickets</span></div>
+          <div class="support-stat"><strong>0</strong><span>In Progress</span></div>
+          <div class="support-stat"><strong>0</strong><span>Awaiting User Info</span></div>
+          <div class="support-stat"><strong>0</strong><span>Resolved</span></div>
         </div>
-      </section>
+        <button class="support-button" onclick="window.open('https://mybills.in/support','_blank')">View Tickets
+          →</button>
+      </div>
+    </section>
 
-      <section id="support">
-        <div class="section-heading"><div><h2>Platform Support</h2><p>Track important support activity from Billing Admin.</p></div></div>
-        <div class="support-panel">
-          <div class="support-stats">
-            <div class="support-stat"><strong>0</strong><span>Open Tickets</span></div>
-            <div class="support-stat"><strong>0</strong><span>In Progress</span></div>
-            <div class="support-stat"><strong>0</strong><span>Awaiting User Info</span></div>
-            <div class="support-stat"><strong>0</strong><span>Resolved</span></div>
-          </div>
-          <button class="support-button" onclick="window.open('https://mybills.in/support','_blank')">View Tickets →</button>
-        </div>
-      </section>
+    <footer>© <span id="yr"></span> MyBeezNus · mybeeznus.com · Simplified Tools for Business</footer>
+  </div>
 
-      <footer>© <span id="yr"></span> MyBeezNus · mybeeznus.com · Simplified Tools for Business</footer>
-    </div>
+  <script>
+    document.getElementById('yr').textContent = new Date().getFullYear();
+  </script>
+</body>
 
-    <script>
-      document.getElementById('yr').textContent = new Date().getFullYear();
-    </script>
-  </body>
 </html>
