@@ -37,5 +37,3 @@ Thumbs.db
 *.swp
 *.swo
 
-# Firebase CLI cache (auto-generated deploy bookkeeping)
-.firebase/

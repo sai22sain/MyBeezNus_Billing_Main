@@ -148,11 +148,7 @@ function Login() {
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          <img
-            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-            alt="Google"
-            style={{ width: '22px', height: '22px' }}
-          />
+          <i className="fab fa-google" aria-hidden="true"></i>
           {loading ? 'Signing in...' : 'Continue with Google'}
         </button>
 

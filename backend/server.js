@@ -7,9 +7,7 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
-  'https://mybills.in',
-  'https://mybeeznus-billing.web.app',
-  'https://mybeeznus.web.app'
+  'https://mybills.in'
 ].filter(Boolean).map((origin) => origin.replace(/\/$/, ''));
 
 app.use(cors({
@@ -18,7 +16,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Payment routes only - all data is in Firestore
+// Payment routes
 app.use('/api/payments', require('./src/routes/payments'));
 
 // MyBeezNus backend library routes (Supabase-backed, service-role)
