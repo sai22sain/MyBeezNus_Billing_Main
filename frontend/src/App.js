@@ -141,7 +141,7 @@ function AppShell() {
         </div>
       )}
 
-      <main className="content">
+      <main className={`content${location.pathname === '/' ? ' dashboard-content' : ''}`}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/new-bill" element={<NewBill />} />

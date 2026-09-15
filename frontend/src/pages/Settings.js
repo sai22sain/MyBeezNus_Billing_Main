@@ -25,7 +25,7 @@ function Settings() {
   const [form, setForm] = useState({
     businessName: '', ownerName: '', phone: '', email: '',
     businessType: 'general',
-    address: '', city: '', state: '', pincode: '',
+    address: '', area: '', city: '', state: '', pincode: '',
     gstNumber: '', panNumber: '',
     billPrefix: 'BILL', customerPrefix: 'CUST',
     defaultTax: '0', currency: '₹',
@@ -37,6 +37,7 @@ function Settings() {
   const [deleteMsg, setDeleteMsg] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pincodeStatus, setPincodeStatus] = useState('');
 
   // ---- Support tickets (CRM) ----
   const [ticketForm, setTicketForm] = useState({ category: 'bug', subject: '', message: '' });
@@ -51,6 +52,39 @@ function Settings() {
     }
     setLoading(false);
   }, [profile]);
+
+  useEffect(() => {
+    const pincode = String(form.pincode || '').trim();
+    if (!isValidPincode(pincode) || pincode.length !== 6) {
+      setPincodeStatus('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setPincodeStatus('Looking up location...');
+
+    fetch(`https://api.postalpincode.in/pincode/${pincode}`, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error('Pincode lookup failed');
+        return response.json();
+      })
+      .then(result => {
+        const office = result?.[0]?.PostOffice?.[0];
+        if (!office) throw new Error('Pincode not found');
+        setForm(previous => ({
+          ...previous,
+          area: office.Name || '',
+          city: office.District || office.Block || '',
+          state: office.State || '',
+        }));
+        setPincodeStatus('Location found. You can edit these details if needed.');
+      })
+      .catch(error => {
+        if (error.name !== 'AbortError') setPincodeStatus('Location not found. Enter the details manually.');
+      });
+
+    return () => controller.abort();
+  }, [form.pincode]);
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
@@ -251,6 +285,10 @@ function Settings() {
         </div>
         <Row>
           <div className="form-group">
+            <label>Area / Locality</label>
+            <input type="text" value={form.area} onChange={e => set('area', e.target.value)} placeholder="Area or locality" />
+          </div>
+          <div className="form-group">
             <label>City</label>
             <input type="text" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Mumbai" />
           </div>
@@ -260,9 +298,10 @@ function Settings() {
           </div>
           <div className="form-group">
             <label>Pincode</label>
-            <input type="text" value={form.pincode} onChange={e => set('pincode', e.target.value)} placeholder="400001" />
+            <input type="text" inputMode="numeric" maxLength={6} value={form.pincode} onChange={e => set('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="400001" />
           </div>
         </Row>
+        {pincodeStatus && <div className="settings-location-status">{pincodeStatus}</div>}
         <Row>
           <div className="form-group">
             <label>Business Type</label>
