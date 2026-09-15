@@ -9,7 +9,7 @@ import { supabase } from '../supabase';
  *   - Excel report export
  *   - Razorpay webhook subscription writes
  */
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL ?? '';
 
 // A deployed site can never reach a localhost API (it would point at the
 // *visitor's* machine), so skip instantly instead of wasting a failing

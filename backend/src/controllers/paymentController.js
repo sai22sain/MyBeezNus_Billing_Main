@@ -2,10 +2,19 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { PLANS, planExpiry } = require('../lib/plans');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Lazily create the client so a missing key doesn't crash the whole module
+// at load time (which would kill the Vercel serverless function cold-start
+// with an obscure error instead of a clear 500 response).
+let razorpay = null;
+const getRazorpay = () => {
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
+    });
+  }
+  return razorpay;
+};
 
 // Create Razorpay order
 const createOrder = async (req, res) => {
@@ -19,7 +28,7 @@ const createOrder = async (req, res) => {
     // Razorpay receipt max length is 56 chars — use a short, unique receipt
     const receipt = `rcpt_${Date.now()}`.slice(0, 56);
 
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount: PLANS[plan].amount,
       currency: PLANS[plan].currency,
       receipt,

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { normalizeMobile, isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL ?? '';
 
 const SECTION = ({ icon, title, subtitle, children }) => (
   <div className="settings-section">

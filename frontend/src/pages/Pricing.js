@@ -3,7 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { saveSubscription, isPro } from '../utils/subscription';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// When deployed to Vercel the backend runs as serverless functions on the
+// SAME origin (see /vercel.json routes), so an empty API_URL = relative
+// /api/... calls — no CORS needed. Local dev keeps the localhost fallback.
+const API_URL = process.env.REACT_APP_API_URL ?? '';
 
 // Load checkout.js only when the user actually starts an upgrade.
 // The script prefetches many asset chunks in the background, so loading it

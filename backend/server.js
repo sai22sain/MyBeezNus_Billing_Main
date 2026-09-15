@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 
@@ -31,4 +31,11 @@ app.use('/api/support', require('./src/routes/support'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'MyBills.in API running' }));
 
-app.listen(PORT, () => console.log(`MyBills.in backend running on port ${PORT}`));
+// Only start an HTTP server when run directly (node server.js).
+// On Vercel this file is loaded as a serverless function — Vercel invokes
+// `app` as a request handler itself, so listen() must be skipped there.
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`MyBills.in backend running on port ${PORT}`));
+}
+
+module.exports = app;
