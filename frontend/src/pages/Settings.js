@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { normalizeMobile, isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
@@ -55,7 +55,7 @@ function Settings() {
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   // ---- Support ticket helpers ----
-  const authedFetch = async (method, url, body) => {
+  const authedFetch = useCallback(async (method, url, body) => {
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(url, {
       method,
@@ -68,16 +68,16 @@ function Settings() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
-  };
+  }, []);
 
-  const loadTickets = async () => {
+  const loadTickets = useCallback(async () => {
     try {
       const r = await authedFetch('GET', `${API_URL}/api/support/mine`);
       setMyTickets(r.tickets || []);
     } catch {
       /* tickets are non-critical - stay silent on failure */
     }
-  };
+  }, [authedFetch]);
 
   const handleRaiseTicket = async () => {
     const subject = ticketForm.subject.trim();
@@ -105,7 +105,7 @@ function Settings() {
 
   useEffect(() => {
     loadTickets();
-  }, []);
+  }, [loadTickets]);
 
   const handleSave = async () => {
     // ---- validation ----
