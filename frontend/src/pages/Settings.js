@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { normalizeMobile, isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
 import { showToast, showConfirmation } from '../services/notificationService';
 import { backendAPI } from '../utils/backend';
+import { supabase } from '../supabase';
 
 const API_URL = process.env.REACT_APP_API_URL ?? '';
 
