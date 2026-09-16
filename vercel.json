@@ -22,10 +22,6 @@
       "dest": "backend/server.js"
     },
     {
-      "src": "/favicon.ico",
-      "dest": "/Bee_Tab_Icon.gif"
-    },
-    {
       "handle": "filesystem"
     },
     {
