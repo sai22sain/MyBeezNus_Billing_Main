@@ -54,18 +54,30 @@ router.get('/mine', async (req, res) => {
   try {
     const { data, error } = await getAdminClient()
       .from('support_tickets')
-      .select('id, app, category, subject, message, status, admin_reply, created_at, updated_at, resolved_at, closed_at, reopened_at, ticket_replies(id, sender, message, created_at)')
+      .select('id, app, category, subject, message, status, admin_reply, created_at, updated_at')
       .eq('user_id', req.user.uid)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) throw error;
 
+    const ticketIds = (data || []).map((ticket) => ticket.id);
+    let replies = [];
+    if (ticketIds.length) {
+      const replyResult = await getAdminClient()
+        .from('ticket_replies')
+        .select('id, ticket_id, sender, message, created_at')
+        .in('ticket_id', ticketIds)
+        .order('created_at', { ascending: true });
+      if (!replyResult.error) replies = replyResult.data || [];
+    }
+
+    const repliesByTicket = replies.reduce((groups, reply) => {
+      (groups[reply.ticket_id] ||= []).push(reply);
+      return groups;
+    }, {});
     const tickets = (data || []).map((ticket) => ({
       ...ticket,
-      replies: (ticket.ticket_replies || []).sort(
-        (left, right) => new Date(left.created_at) - new Date(right.created_at)
-      ),
-      ticket_replies: undefined,
+      replies: repliesByTicket[ticket.id] || [],
     }));
 
     return res.json({ tickets });

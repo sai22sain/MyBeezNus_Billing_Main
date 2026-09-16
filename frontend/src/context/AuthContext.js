@@ -57,6 +57,21 @@ const toDbProfile = (uid, p) => ({
   updated_at: new Date().toISOString(),
 });
 
+const saveProfile = async (uid, profile) => {
+  const row = toDbProfile(uid, profile);
+  const { data: updated, error: updateError } = await supabase
+    .from('profiles')
+    .update(row)
+    .eq('user_id', uid)
+    .select('user_id')
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (updated) return;
+
+  const { error: insertError } = await supabase.from('profiles').insert(row);
+  if (insertError) throw insertError;
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfileState] = useState(null);
@@ -94,7 +109,7 @@ export function AuthProvider({ children }) {
     setProfileState(p);
     const sbUser = (await supabase.auth.getUser()).data.user;
     if (sbUser) {
-      await supabase.from('profiles').upsert(toDbProfile(sbUser.id, p), { onConflict: 'user_id' });
+      await saveProfile(sbUser.id, p);
     }
   };
 
