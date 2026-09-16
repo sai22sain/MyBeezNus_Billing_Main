@@ -106,11 +106,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const setProfile = async (p) => {
-    setProfileState(p);
     const sbUser = (await supabase.auth.getUser()).data.user;
     if (sbUser) {
       await saveProfile(sbUser.id, p);
     }
+    setProfileState(p);
   };
 
   const logout = () => {

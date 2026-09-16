@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
 import { normalizeMobile, isValidMobile, isValidName, isValidPincode } from '../utils/validation';
@@ -86,11 +86,20 @@ const BUSINESS_TEMPLATES = {
 };
 
 function Onboarding() {
-  const { user, setProfile } = useAuth();
-  const [step, setStep] = useState(1);
+  const { user, setProfile, logout } = useAuth();
+  const draftKey = `mybeeznus-onboarding-${user?.uid || 'draft'}`;
+  const savedDraft = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(draftKey) || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const [step, setStep] = useState(savedDraft?.step || 1);
   const [loading, setLoading] = useState(false);
-  const [businessType, setBusinessType] = useState('general');
-  const [businessData, setBusinessData] = useState({
+  const finishingRef = useRef(false);
+  const [businessType, setBusinessType] = useState(savedDraft?.businessType || 'general');
+  const [businessData, setBusinessData] = useState(savedDraft?.businessData || {
     businessName: '',
     ownerName: user?.displayName || '',
     phone: '',
@@ -101,6 +110,10 @@ function Onboarding() {
     pincode: '',
   });
   const [pincodeStatus, setPincodeStatus] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem(draftKey, JSON.stringify({ step, businessType, businessData }));
+  }, [draftKey, step, businessType, businessData]);
 
   useEffect(() => {
     const pincode = businessData.pincode.trim();
@@ -146,27 +159,38 @@ function Onboarding() {
     && businessData.pincode.trim().length === 6;
 
   const handleFinish = async () => {
+    if (finishingRef.current) return;
     // ---- validation (defence in depth; step 1 already gated) ----
     if (!isValidName(businessData.businessName)) { showToast({ type: 'warning', message: 'Business name must be 2–60 characters.' }); setStep(1); return; }
     if (!isValidName(businessData.ownerName)) { showToast({ type: 'warning', message: 'Owner name must be 2–60 characters.' }); setStep(1); return; }
     if (!isValidMobile(businessData.phone)) { showToast({ type: 'warning', message: 'Enter a valid 10-digit mobile number starting with 6-9.' }); setStep(1); return; }
+    finishingRef.current = true;
     setLoading(true);
     try {
       const uid = user.uid;
       const template = BUSINESS_TEMPLATES[businessType] || BUSINESS_TEMPLATES.general;
 
-      // Save business profile (AuthContext.setProfile persists to Supabase)
       const profileData = {
         ...businessData,
         phone: normalizeMobile(businessData.phone),
         businessType,
         email: user.email,
       };
-      await setProfile(profileData);
 
-      // Save default categories, keep id -> name map for items
+      // Reuse existing template data so retries after a partial failure are safe.
+      const { data: existingCategories, error: categoriesError } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('user_id', uid)
+        .in('name', template.categories);
+      if (categoriesError) throw categoriesError;
+
       const catIdByName = {};
+      (existingCategories || []).forEach(category => {
+        catIdByName[category.name] = category.id;
+      });
       for (const cat of template.categories) {
+        if (catIdByName[cat]) continue;
         const { data, error } = await supabase
           .from('categories')
           .insert({ user_id: uid, name: cat })
@@ -176,8 +200,17 @@ function Onboarding() {
         catIdByName[cat] = data.id;
       }
 
-      // Save default items
+      const { data: existingItems, error: itemsError } = await supabase
+        .from('items')
+        .select('name')
+        .eq('user_id', uid)
+        .in('name', template.items.map(item => item.name));
+      if (itemsError) throw itemsError;
+      const existingItemNames = new Set((existingItems || []).map(item => item.name));
+
+      // Save only missing default items.
       for (const item of template.items) {
+        if (existingItemNames.has(item.name)) continue;
         const { error } = await supabase.from('items').insert({
           user_id: uid,
           name: item.name,
@@ -188,11 +221,17 @@ function Onboarding() {
         });
         if (error) throw error;
       }
+
+      // Commit the profile only after all onboarding setup succeeds.
+      await setProfile(profileData);
+      localStorage.removeItem(draftKey);
     } catch (err) {
       console.error('Onboarding error:', err);
       showToast({ type: 'error', message: 'Unable to finish setup. Please try again.' });
+    } finally {
+      finishingRef.current = false;
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const inputStyle = {
@@ -223,9 +262,16 @@ function Onboarding() {
         maxWidth: '480px',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
       }}>
-        <div className="onboarding-brand-row">
-          <Logo size={36} radius={0} />
-          <span>MyBeezNus Billing</span>
+        <div className="onboarding-header">
+          <div className="onboarding-brand-row">
+            <Logo size={36} radius={0} />
+            <span>MyBeezNus Billing</span>
+          </div>
+          <button className="onboarding-user-button" type="button" onClick={logout} title="Sign out">
+            <i className="fas fa-user-circle" aria-hidden="true"></i>
+            <span>{user?.displayName || user?.email || 'Account'}</span>
+            <i className="fas fa-sign-out-alt" aria-hidden="true"></i>
+          </button>
         </div>
         <div className="onboarding-progress-label">Step {step} of 4</div>
         {/* Progress */}
