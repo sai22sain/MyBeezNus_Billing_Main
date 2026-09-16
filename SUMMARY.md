@@ -1,13 +1,13 @@
-# Salon Management Application - Complete Summary
+# MyBeezNus Business Billing Summary
 
 ## ✅ What Has Been Built
 
-A complete, production-ready Salon Billing and Customer Management Application with:
+A complete, production-ready business billing application for small businesses with:
 
 ### Core Features Implemented:
 
 1. **Customer Management**
-   - Auto-generated Customer IDs (SALON-00001, SALON-00002...)
+   - Auto-generated customer IDs using the configured business prefix
    - Full CRUD operations
    - Search by mobile/name
    - Customer history tracking
@@ -53,7 +53,7 @@ A complete, production-ready Salon Billing and Customer Management Application w
 ## 🗂️ Project Structure
 
 ```
-salon-app/
+mybeeznus-business-billing/
 ├── backend/          # Node.js + Express + SQLite
 ├── frontend/         # React application
 ├── README.md         # Complete documentation
@@ -108,13 +108,13 @@ WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 WHATSAPP_ACCESS_TOKEN=your_access_token
 ```
 
-### 2. Customize Salon Details
+### 2. Customize Business Details
 
 Update in `backend/.env`:
 ```
-SALON_NAME=Your Salon Name
-SALON_ADDRESS=Your Complete Address
-SALON_PHONE=Your Contact Number
+BUSINESS_NAME=Your Business Name
+BUSINESS_ADDRESS=Your Complete Address
+BUSINESS_PHONE=Your Contact Number
 ```
 
 ### 3. Add Your Services
@@ -207,7 +207,7 @@ The application is complete and ready to use. Just:
 1. Install dependencies
 2. Configure WhatsApp API (when you have the credentials)
 3. Start the application
-4. Begin managing your salon!
+4. Begin managing your business!
 
 ---
 

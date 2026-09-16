@@ -1,7 +1,7 @@
 {
-  "name": "salon-backend",
+  "name": "mybeeznus-business-billing-backend",
   "version": "1.0.0",
-  "description": "Salon Billing and Customer Management Backend",
+  "description": "Business billing backend for small businesses",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

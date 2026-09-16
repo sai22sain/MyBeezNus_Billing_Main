@@ -11,9 +11,9 @@ const generateBillPDF = (billData, outputPath) => {
       doc.pipe(stream);
 
       // Header
-      doc.fontSize(20).text(process.env.SALON_NAME || 'Salon Name', { align: 'center' });
-      doc.fontSize(10).text(process.env.SALON_ADDRESS || '', { align: 'center' });
-      doc.text(process.env.SALON_PHONE || '', { align: 'center' });
+      doc.fontSize(20).text(process.env.BUSINESS_NAME || process.env.SALON_NAME || 'Business Name', { align: 'center' });
+      doc.fontSize(10).text(process.env.BUSINESS_ADDRESS || process.env.SALON_ADDRESS || '', { align: 'center' });
+      doc.text(process.env.BUSINESS_PHONE || process.env.SALON_PHONE || '', { align: 'center' });
       doc.moveDown();
 
       // Bill details

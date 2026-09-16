@@ -92,7 +92,7 @@ function Login() {
 
         {/* Logo / Icon */}
         <div style={{ margin: '0 auto 16px', display: 'flex', justifyContent: 'center' }}>
-          <Logo size={64} radius={16} style={{ boxShadow: '0 8px 24px rgba(102,126,234,0.4)' }} />
+          <Logo size={64} />
         </div>
 
         <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#2c3e50', marginBottom: '8px' }}>

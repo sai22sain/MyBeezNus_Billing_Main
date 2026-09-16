@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo Building Salon Management Application
+echo Building MyBeezNus Business Billing Application
 echo ========================================
 echo.
 

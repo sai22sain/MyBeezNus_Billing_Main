@@ -1,289 +1,301 @@
-# Salon Billing and Customer Management Application
+# MyBeezNus Business Billing
 
-A complete salon management system with billing, customer management, WhatsApp integration, and reporting features. Optimized for ChromeOS Flex and Chromebook.
+MyBeezNus is an easy-to-use, multi-tenant business billing application for small businesses. It provides customer and item management, bill creation, dashboards, reports, subscriptions, account settings, and support tickets. User authentication and tenant data are powered by Supabase.
 
 ## Features
 
 ### Customer Management
-- Auto-generated Customer IDs (SALON-00001, SALON-00002, etc.)
+- Auto-generated customer IDs using each business's configured prefix
 - Customer profiles with name, mobile, DOB, gender, address, notes
 - Search customers by mobile or name
 - View customer visit history
 - Birthday reminders
+## Technology
 
-### Services/Products Management
-- Categorized services (Hair, Skin, Grooming, Spa, Products)
-- Price and tax management
-- Enable/disable services
-- Easy service selection during billing
+- **Frontend:** React 18, React Router 6, Create React App, Supabase JavaScript client
+- **Backend:** Node.js, Express, Supabase service-role client
+- **Database and authentication:** Supabase PostgreSQL and Supabase Auth
+- **Payments:** Razorpay
+- **Documents and exports:** PDFKit and ExcelJS
+- **Messaging:** WhatsApp Cloud API integration
+- **Deployment:** Vercel or a Node.js host running the production server
 
-### Billing System
-- Auto-generated Bill Numbers (BILL-00001, BILL-00002, etc.)
-- Multiple items per bill
-- Automatic tax calculation
-- Discount support
-- Multiple payment modes (Cash, UPI, Card)
-- PDF bill generation
-- WhatsApp bill delivery
+## Requirements
 
-### WhatsApp Integration
-- Automatic bill delivery via WhatsApp Cloud API
-- PDF attachment with bill details
-- Resend bill option
+- Node.js 24.x for the frontend, as specified by `frontend/package.json`
+- npm
+- A Supabase project for authentication and application data
+- Google OAuth configured in Supabase Auth for sign-in
+- Backend Supabase service-role credentials for privileged API routes
 
-### Reports & Analytics
-- Daily revenue reports
-- Monthly revenue reports
-- Top services analysis
-- Repeat customer tracking
-- Export reports to Excel
+The backend no longer uses SQLite as its active data store. Do not follow older documentation that refers to `salon.db`, SQLite tables, or `backend/seed.js`; those instructions do not describe the current application.
 
-## Technology Stack
+## Project Structure
 
-- **Frontend**: React 18
-- **Backend**: Node.js with Express
-- **Database**: SQLite (perfect for ChromeOS)
-- **PDF Generation**: PDFKit
-- **WhatsApp**: Meta WhatsApp Cloud API
-- **Excel Export**: ExcelJS
-
-## Installation
-
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
-
-### Backend Setup
-
-1. Navigate to backend directory:
-```bash
-cd backend
+```text
+.
+├── api/
+│   └── server.js                 # Vercel serverless API entry point
+├── backend/
+│   ├── server.js                 # Express development/API server
+│   ├── server.production.js      # Express server serving frontend/build
+│   ├── src/
+│   │   ├── controllers/          # Payment and report handlers
+│   │   ├── lib/                  # Supabase, tenant, number, and plan helpers
+│   │   ├── routes/                # Account, payments, numbers, reports, support, webhooks
+│   │   └── utils/                 # PDF, timezone, and WhatsApp utilities
+│   └── package.json
+├── frontend/
+│   ├── public/                   # Static assets and public index.html
+│   ├── src/
+│   │   ├── components/           # Shared UI and branding components
+│   │   ├── context/              # Authentication context
+│   │   ├── pages/                # Dashboard, billing, customers, items, reports, etc.
+│   │   ├── services/             # Notifications and shared services
+│   │   └── utils/                # Supabase, API, caching, validation, and formatting
+│   └── package.json
+├── supabase-migrations/          # Database schema and policy migrations
+├── start.bat                     # Windows development launcher
+├── build-and-run.bat             # Windows production build and launcher
+├── vercel.json                   # Vercel build and API rewrite configuration
+└── package.json                  # Root convenience scripts
 ```
 
-2. Install dependencies:
-```bash
-npm install
+## Configuration
+
+### Frontend variables
+
+Create `frontend/.env.local` when overriding the built-in Supabase project or when pointing the frontend at a deployed backend:
+
+```dotenv
+REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+REACT_APP_API_URL=http://localhost:5000
 ```
 
-3. Configure environment variables in `.env`:
-```
+`REACT_APP_API_URL` may be empty for local development when the backend is not required by a particular workflow. The frontend uses Supabase directly for normal tenant CRUD operations and uses the backend for privileged operations such as number allocation, report export, and account deletion.
+
+The current frontend includes a built-in Supabase project fallback. Set the variables explicitly for a different project or for a controlled deployment.
+
+### Backend variables
+
+Create `backend/.env`:
+
+```dotenv
 PORT=5000
-DB_PATH=./salon.db
+FRONTEND_URL=http://localhost:3000
 
-# WhatsApp Cloud API Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Razorpay payments and webhook verification
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
+
+# Optional WhatsApp Cloud API and PDF branding
 WHATSAPP_API_URL=https://graph.facebook.com/v18.0
 WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 WHATSAPP_ACCESS_TOKEN=your_access_token
-
-# Salon Details
-SALON_NAME=Your Salon Name
-SALON_ADDRESS=Your Salon Address
-SALON_PHONE=Your Contact Number
+BUSINESS_NAME=Your Business Name
+BUSINESS_ADDRESS=Your Business Address
+BUSINESS_PHONE=Your Contact Number
 ```
 
-4. Start the backend server:
+Never expose `SUPABASE_SERVICE_ROLE_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, or `WHATSAPP_ACCESS_TOKEN` in frontend code or public environment variables. The older `SALON_NAME`, `SALON_ADDRESS`, and `SALON_PHONE` variables remain supported as compatibility aliases.
+
+## Supabase Setup
+
+1. Create or select a Supabase project.
+2. Configure Google under **Authentication > Providers**.
+3. Add the local and deployed application URLs under **Authentication > URL Configuration**.
+4. Run the SQL files in `supabase-migrations/` in filename order using the Supabase SQL editor or migration tooling.
+5. Confirm that Row Level Security policies are enabled for application tables.
+6. Set the frontend and backend environment variables described above.
+
+The migrations include account-deletion request/audit tables, support tickets, and billing behavior such as billing without a customer. The application expects Supabase tables including `profiles`, `customers`, `items`, `categories`, `bills`, `sequences`, `subscriptions`, `support_tickets`, and the account-deletion audit tables.
+
+## Installation
+
+From the repository root:
+
 ```bash
-npm start
+npm run install-all
 ```
 
-The backend will run on `http://localhost:5000`
+Or install each package separately:
 
-### Frontend Setup
-
-1. Navigate to frontend directory:
 ```bash
-cd frontend
+npm install --prefix backend
+npm install --prefix frontend
 ```
 
-2. Install dependencies:
+## Local Development
+
+### Windows shortcut
+
+Run `start.bat`. It installs dependencies if needed and opens separate command windows for the backend and frontend.
+
+### Manual startup
+
+Start the backend in one terminal:
+
 ```bash
-npm install
+npm --prefix backend start
 ```
 
-3. Start the development server:
+Start the frontend in a second terminal:
+
 ```bash
-npm start
+npm --prefix frontend start
 ```
 
-The frontend will run on `http://localhost:3000`
+Open:
 
-## WhatsApp Cloud API Setup
+- Frontend: http://localhost:3000
+- Backend health check: http://localhost:5000/api/health
 
-1. Go to [Meta for Developers](https://developers.facebook.com/)
-2. Create a Business App
-3. Add WhatsApp product to your app
-4. Get your Phone Number ID from the WhatsApp dashboard
-5. Generate a permanent Access Token
-6. Update the `.env` file with these credentials:
-   - `WHATSAPP_PHONE_NUMBER_ID`: Your phone number ID
-   - `WHATSAPP_ACCESS_TOKEN`: Your access token
+The root project does not define an `npm start` script. Use the prefixed commands above or the Windows launcher.
 
-### Important WhatsApp Notes:
-- Phone numbers must be in international format (e.g., +919876543210)
-- Test with your own number first
-- For production, you need to verify your business and get approval from Meta
+## Available Scripts
 
-## Database Schema
+### Root scripts
 
-### Customers Table
-- customer_id (TEXT, PRIMARY KEY)
-- name (TEXT)
-- mobile (TEXT, UNIQUE)
-- dob (TEXT)
-- gender (TEXT)
-- address (TEXT)
-- notes (TEXT)
-- created_at (DATETIME)
+| Command | Purpose |
+| --- | --- |
+| `npm run install-all` | Install backend and frontend dependencies |
+| `npm run dev-backend` | Start the backend |
+| `npm run dev-frontend` | Start the React development server |
+| `npm run build` | Build the frontend |
+| `npm run production` | Start `backend/server.production.js` |
 
-### Categories Table
-- category_id (INTEGER, PRIMARY KEY)
-- category_name (TEXT, UNIQUE)
+### Frontend scripts
 
-### Items Table
-- item_id (INTEGER, PRIMARY KEY)
-- item_name (TEXT)
-- category_id (INTEGER)
-- price (REAL)
-- tax (REAL)
-- is_active (INTEGER)
+```bash
+npm --prefix frontend start
+npm --prefix frontend run build
+npm --prefix frontend test
+```
 
-### Bills Table
-- bill_id (INTEGER, PRIMARY KEY)
-- bill_number (TEXT, UNIQUE)
-- customer_id (TEXT)
-- total_amount (REAL)
-- discount (REAL)
-- tax (REAL)
-- final_amount (REAL)
-- payment_mode (TEXT)
-- created_at (DATETIME)
+### Backend scripts
 
-### Bill_Items Table
-- id (INTEGER, PRIMARY KEY)
-- bill_id (INTEGER)
-- item_id (INTEGER)
-- quantity (INTEGER)
-- price (REAL)
-- subtotal (REAL)
+```bash
+npm --prefix backend start
+npm --prefix backend run dev
+```
 
-## Usage Guide
+## Backend API
 
-### Adding a Customer
-1. Go to "Customers" page
-2. Click "Add Customer"
-3. Fill in customer details (name and mobile are required)
-4. Click "Add Customer"
+All backend routes are mounted under `/api`. Routes marked authenticated require a Supabase access token in the form `Authorization: Bearer <token>`.
 
-### Creating a Bill
-1. Go to "New Bill" page
-2. Search and select a customer (or add new customer)
-3. Click on services/products to add to bill
-4. Adjust quantities if needed
-5. Add discount (optional)
-6. Select payment mode
-7. Click "Generate Bill & Send WhatsApp"
+| Route | Methods | Purpose |
+| --- | --- | --- |
+| `/api/health` | `GET` | Health check |
+| `/api/numbers/next-bill` | `POST` | Allocate the next tenant-scoped bill number; authenticated |
+| `/api/numbers/next-customer` | `POST` | Allocate the next tenant-scoped customer number; authenticated |
+| `/api/reports/export` | `GET` | Download an authenticated tenant's Excel revenue report |
+| `/api/account` | `DELETE` | Delete the authenticated account and tenant data |
+| `/api/support` | `POST` | Create an authenticated support ticket |
+| `/api/support/mine` | `GET` | List the authenticated user's support tickets and ordered comments |
+| `/api/support/:ticketId/replies` | `POST` | Add a follow-up comment to the authenticated user's open ticket |
+| `/api/payments/create-order` | `POST` | Create a Razorpay order |
+| `/api/payments/verify-payment` | `POST` | Verify a Razorpay payment |
+| `/api/webhooks/razorpay` | `POST` | Receive and verify Razorpay subscription webhooks |
 
-### Managing Services
-1. Go to "Services" page
-2. Click "Add Service" to create new service
-3. Edit existing services by clicking "Edit"
-4. Enable/disable services as needed
+The legacy report paths `/api/reports/dashboard`, `/daily`, `/monthly`, `/top-services`, and `/repeat-customers` remain registered for compatibility, but the current frontend primarily reads tenant data through Supabase and uses the backend export route for Excel downloads.
 
-### Viewing Reports
-1. Go to "Reports" page
-2. View daily/monthly revenue
-3. Check top services
-4. See repeat customers
-5. Export reports to Excel
+## Production
 
-## API Endpoints
+### Vercel
 
-### Customers
-- `GET /api/customers` - Get all customers
-- `GET /api/customers/search?query=` - Search customers
-- `GET /api/customers/:id` - Get customer by ID
-- `POST /api/customers` - Create customer
-- `PUT /api/customers/:id` - Update customer
-- `GET /api/customers/:id/history` - Get customer history
-- `GET /api/customers/birthdays` - Get birthday reminders
+The included `vercel.json`:
 
-### Items/Services
-- `GET /api/items` - Get all items
-- `GET /api/items/active` - Get active items
-- `POST /api/items` - Create item
-- `PUT /api/items/:id` - Update item
-- `PATCH /api/items/:id/toggle` - Toggle item status
-- `GET /api/items/categories` - Get categories
-- `POST /api/items/categories` - Create category
+- Installs backend and frontend dependencies
+- Builds the React frontend into `frontend/build`
+- Rewrites `/api/*` requests to `api/server`
+- Rewrites other routes to the React application entry point
 
-### Bills
-- `GET /api/bills` - Get all bills
-- `GET /api/bills/:id` - Get bill by ID
-- `POST /api/bills` - Create bill
-- `GET /api/bills/:id/download` - Download bill PDF
-- `POST /api/bills/:id/whatsapp` - Send bill via WhatsApp
+Configure the frontend and backend environment variables in the Vercel project settings. The Vercel API entry point uses the Express app from `backend/server.js` and does not start a local listener.
 
-### Reports
-- `GET /api/reports/dashboard` - Get dashboard stats
-- `GET /api/reports/daily?date=` - Get daily revenue
-- `GET /api/reports/monthly?month=&year=` - Get monthly revenue
-- `GET /api/reports/top-services?limit=` - Get top services
-- `GET /api/reports/repeat-customers` - Get repeat customers
-- `GET /api/reports/export?startDate=&endDate=` - Export revenue report
+### Node.js production server
 
-## ChromeOS Optimization
+Build the frontend and start the Express server:
 
-This application is optimized for ChromeOS Flex:
-- Uses SQLite (no external database server needed)
-- Lightweight and fast
-- Tablet-friendly UI
-- Works offline (except WhatsApp features)
-- Low resource consumption
+```bash
+npm --prefix frontend run build
+npm run production
+```
+
+The existing Windows shortcut performs the build and starts `backend/server.production.js`:
+
+```text
+build-and-run.bat
+```
+
+The production server serves the compiled React app and API from one port, defaulting to `http://localhost:5000`.
+
+## Testing and Verification
+
+Run the frontend build before deployment:
+
+```bash
+npm --prefix frontend run build
+```
+
+Run the frontend test command when changing tested UI behavior:
+
+```bash
+npm --prefix frontend test
+```
+
+Useful checks:
+
+```bash
+curl http://localhost:5000/api/health
+```
+
+Verify that Supabase authentication works, a profile can be created during onboarding, and authenticated backend calls include a valid access token.
 
 ## Troubleshooting
 
-### Backend won't start
-- Check if port 5000 is available
-- Verify all dependencies are installed
-- Check .env file configuration
+### `npm start` fails from the repository root
 
-### WhatsApp not sending
-- Verify WhatsApp credentials in .env
-- Check phone number format (+country code)
-- Ensure internet connection
-- Check Meta Business Manager for API status
+The root package has no `start` script. Use `npm --prefix frontend start`, `npm --prefix backend start`, or run `start.bat` on Windows.
 
-### Database errors
-- Delete salon.db file and restart backend to recreate
-- Check file permissions
+### Authentication does not complete
 
-## Production Deployment
+- Confirm Google is enabled in Supabase Auth.
+- Add the exact local or deployed origin to Supabase redirect settings.
+- Check `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_ANON_KEY`.
+- Inspect the browser console for Supabase OAuth errors.
 
-### For ChromeOS/Chromebook:
-1. Build frontend:
-```bash
-cd frontend
-npm run build
-```
+### Backend returns `401 Authentication required`
 
-2. Serve frontend build from backend:
-Update backend server.js to serve static files
+The backend expects `Authorization: Bearer <supabase access token>`. Confirm the user is signed in and that the frontend API URL points to the correct backend.
 
-3. Run backend:
-```bash
-cd backend
-npm start
-```
+### Backend reports missing Supabase credentials
 
-### For Cloud Deployment:
-- Deploy backend to services like Heroku, AWS, or DigitalOcean
-- Deploy frontend to Netlify, Vercel, or similar
-- Update API_BASE_URL in frontend to point to deployed backend
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `backend/.env`. The service-role key is server-only and must not be placed in `frontend/.env*`.
+
+### Payment or subscription updates do not arrive
+
+- Confirm the Razorpay key variables are configured.
+- Point the Razorpay webhook to `/api/webhooks/razorpay`.
+- Set the same webhook secret in Razorpay and `RAZORPAY_WEBHOOK_SECRET`.
+- Confirm the webhook signature header is present.
+
+### Report export fails
+
+Confirm the backend is running, the frontend API URL is correct, the user is authenticated, and both `startDate` and `endDate` are supplied in `YYYY-MM-DD` format.
+
+## Security Notes
+
+- Supabase service-role credentials are used only by the backend.
+- Backend tenant routes verify the Supabase JWT and scope privileged queries to the authenticated `user_id`.
+- Support-ticket comments are stored in `ticket_replies`; users can read and add comments only on their own non-closed tickets.
+- Do not commit `.env`, `.env.local`, service-role keys, payment secrets, or WhatsApp access tokens.
+- Review and test Supabase Row Level Security policies before production deployment.
 
 ## License
 
-MIT License - Free to use and modify
-
-## Support
-
-For issues or questions, please create an issue in the repository.
+This project is distributed under the MIT license as declared by the root package metadata.

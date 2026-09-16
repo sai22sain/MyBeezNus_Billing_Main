@@ -39,7 +39,7 @@ app.listen(PORT, () => {
   ========================================
   Server running on: http://localhost:${PORT}
   Environment: Production
-  Database: ${process.env.DB_PATH || './salon.db'}
+  Data store: Supabase
   ========================================
   `);
 });

@@ -1,4 +1,4 @@
-# Quick Setup Guide for Salon Management Application
+# MyBeezNus Business Billing Setup
 
 ## Step 1: Install Dependencies
 
@@ -27,9 +27,9 @@ npm install
 ```
 WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id_here
 WHATSAPP_ACCESS_TOKEN=your_access_token_here
-SALON_NAME=Your Salon Name
-SALON_ADDRESS=Your Address
-SALON_PHONE=Your Phone
+BUSINESS_NAME=Your Business Name
+BUSINESS_ADDRESS=Your Address
+BUSINESS_PHONE=Your Phone
 ```
 
 ## Step 3: Seed Sample Data (Optional)
@@ -39,7 +39,7 @@ cd backend
 node seed.js
 ```
 
-This will add sample services to get you started.
+This will add sample items to get you started when the optional seed script is available.
 
 ## Step 4: Start the Application
 
@@ -67,7 +67,7 @@ npm start
 
 ## First Time Usage
 
-1. **Add Services**: Go to Services page and add your salon services
+1. **Add Items**: Go to Items and add the products or services your business provides
 2. **Add Customers**: Go to Customers page and add customer details
 3. **Create Bill**: Go to New Bill page to create your first bill
 4. **View Reports**: Check Dashboard and Reports for analytics
@@ -93,8 +93,8 @@ If port 5000 or 3000 is already in use:
 - Check Meta Business Manager for API limits
 
 ### Database Issues
-- Delete salon.db and restart backend
-- Run seed.js again if needed
+- Check the Supabase URL, service-role key, migrations, and Row Level Security policies
+- Confirm the backend is running with `npm --prefix backend start`
 
 ## Production Deployment
 

@@ -1,7 +1,7 @@
-# Salon Management Application - Project Structure
+# MyBeezNus Business Billing Project Structure
 
 ```
-salon-app/
+mybeeznus-business-billing/
 │
 ├── backend/                          # Backend Node.js application
 │   ├── src/
@@ -27,7 +27,7 @@ salon-app/
 │   ├── server.js                     # Development server
 │   ├── server.production.js          # Production server (serves frontend)
 │   ├── seed.js                       # Sample data seeder
-│   └── salon.db                      # SQLite database (auto-created)
+│   └── package.json                  # Backend dependencies and scripts
 │
 ├── frontend/                         # React frontend application
 │   ├── public/
@@ -92,7 +92,7 @@ salon-app/
 **pdfGenerator.js**
 - Generate PDF bills
 - Format bill layout
-- Include salon branding
+- Include business branding
 
 ### Frontend Files
 
@@ -146,10 +146,11 @@ salon-app/
 
 Required in `backend/.env`:
 - PORT
-- DB_PATH
+- SUPABASE_URL
+- SUPABASE_SERVICE_ROLE_KEY
 - WHATSAPP_API_URL
 - WHATSAPP_PHONE_NUMBER_ID
 - WHATSAPP_ACCESS_TOKEN
-- SALON_NAME
-- SALON_ADDRESS
-- SALON_PHONE
+- BUSINESS_NAME
+- BUSINESS_ADDRESS
+- BUSINESS_PHONE

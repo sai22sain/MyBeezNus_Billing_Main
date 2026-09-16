@@ -1,4 +1,4 @@
-# Salon Management Software - Subscription Business Plan
+# MyBeezNus Business Billing Subscription Plan
 
 ## Current Features (Free/Basic Version)
 - Customer Management
@@ -7,14 +7,14 @@
 - WhatsApp Integration (Web)
 - Basic Reports
 - Single User
-- Local Database (SQLite)
+- Cloud data storage with Supabase
 
 ---
 
 ## Subscription Tiers
 
 ### 🆓 FREE TIER (₹0/month)
-**Target:** Small salons, testing users
+**Target:** Small businesses and testing users
 - Up to 50 customers
 - Up to 20 services
 - 100 bills per month
@@ -25,7 +25,7 @@
 - Community support
 
 ### 💼 BASIC TIER (₹499/month or ₹4,999/year)
-**Target:** Small to medium salons
+**Target:** Small to medium businesses
 - Unlimited customers
 - Unlimited services
 - Unlimited bills
@@ -40,7 +40,7 @@
 - Customer loyalty points
 
 ### 🚀 PROFESSIONAL TIER (₹999/month or ₹9,999/year)
-**Target:** Medium to large salons, chains
+**Target:** Established businesses and multi-location operators
 - Everything in Basic +
 - 5 devices/users
 - Multi-branch support
@@ -56,7 +56,7 @@
 - Data export (Excel, PDF)
 
 ### 🏢 ENTERPRISE TIER (Custom Pricing)
-**Target:** Salon chains, franchises
+**Target:** Larger organizations and franchises
 - Everything in Professional +
 - Unlimited devices/users
 - Unlimited branches
@@ -104,9 +104,9 @@
 - Overage alerts
 
 ### 5. **Multi-tenancy**
-- Separate database per salon
+- Tenant-isolated business data
 - Data isolation
-- Custom subdomain (salon-name.yourdomain.com)
+- Custom subdomain (business-name.yourdomain.com)
 - Tenant management dashboard
 
 ### 6. **Advanced Features**
@@ -286,7 +286,7 @@
 ## Marketing Channels
 
 1. **Digital Marketing**
-   - Google Ads (salon management software)
+   - Google Ads (small business billing software)
    - Facebook/Instagram ads
    - YouTube tutorials
    - SEO optimization
@@ -298,17 +298,17 @@
    - Webinars
 
 3. **Partnerships**
-   - Salon associations
+   - Local business associations
    - Beauty product suppliers
-   - Salon equipment vendors
-   - Beauty schools
+   - Industry suppliers and software partners
+   - Local business training organizations
 
 4. **Referral Program**
-   - Refer a salon, get 1 month free
+   - Refer a business, get 1 month free
    - Affiliate program (20% commission)
 
 5. **Local Marketing**
-   - Visit salons directly
+   - Visit local businesses directly
    - Trade shows
    - Local events
    - Print materials
@@ -353,7 +353,7 @@
 
 3. **Product Metrics**
    - Feature usage
-   - Bills created per salon
+   - Bills created per business
    - Average bill value
    - Support tickets
    - App performance
@@ -430,13 +430,13 @@
 3. **Pricing** - Competitive, value for money
 4. **Marketing** - Reach target audience effectively
 5. **Continuous Improvement** - Regular updates, new features
-6. **Customer Success** - Help salons grow their business
+6. **Customer Success** - Help small businesses grow
 
 ---
 
 ## Risk Mitigation
 
-1. **Competition** - Focus on niche (salons), better UX
+1. **Competition** - Focus on simple workflows and better UX across business types
 2. **Churn** - Excellent support, regular engagement
 3. **Technical Issues** - Robust testing, monitoring
 4. **Payment Failures** - Multiple payment options, reminders
@@ -444,4 +444,4 @@
 
 ---
 
-This plan provides a comprehensive roadmap for converting your salon management software into a successful subscription business. Start with the MVP, validate with real users, then gradually add features based on customer feedback and demand.
+This plan provides a roadmap for growing MyBeezNus into a successful small-business billing subscription. Start with the current billing foundation, validate it with businesses from several segments, then add features based on customer feedback and demand.

@@ -88,8 +88,8 @@ class WhatsAppService {
 
   async sendBill(to, customerName, totalAmount, pdfPath) {
     try {
-      const salonName = process.env.SALON_NAME || 'Our Salon';
-      const message = `Hello ${customerName},\n\nThank you for visiting ${salonName}.\n\nYour bill amount is ₹${totalAmount}.\n\nBill copy attached.`;
+      const businessName = process.env.BUSINESS_NAME || process.env.SALON_NAME || 'Our Business';
+      const message = `Hello ${customerName},\n\nThank you for choosing ${businessName}.\n\nYour bill amount is ₹${totalAmount}.\n\nBill copy attached.`;
       
       // Upload PDF
       const mediaId = await this.uploadMedia(pdfPath);

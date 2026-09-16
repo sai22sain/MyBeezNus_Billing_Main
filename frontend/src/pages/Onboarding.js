@@ -16,7 +16,7 @@ const BUSINESS_TYPES = [
 ];
 
 const BUSINESS_NAME_LABELS = {
-  salon: 'Salon Name',
+  salon: 'Business Name',
   retail: 'Shop / Store Name',
   restaurant: 'Restaurant Name',
   grocery: 'Store Name',
@@ -89,7 +89,7 @@ function Onboarding() {
   const { user, setProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [businessType, setBusinessType] = useState('salon');
+  const [businessType, setBusinessType] = useState('general');
   const [businessData, setBusinessData] = useState({
     businessName: '',
     ownerName: user?.displayName || '',

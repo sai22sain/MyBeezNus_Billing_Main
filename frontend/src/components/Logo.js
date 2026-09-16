@@ -46,7 +46,6 @@ function Logo({ size = 38, radius = 10, className = '', style = {} }) {
         borderRadius: radius,
         objectFit: 'cover',
         flexShrink: 0,
-        background: '#fff',
         ...style,
       }}
       onError={() =>

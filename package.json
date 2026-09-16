@@ -1,7 +1,7 @@
 {
-  "name": "salon-management-app",
+  "name": "mybeeznus-business-billing",
   "version": "1.0.0",
-  "description": "Complete Salon Billing and Customer Management Application",
+  "description": "Easy-to-use business billing application for small businesses",
   "scripts": {
     "install-all": "cd backend && npm install && cd ../frontend && npm install",
     "dev-backend": "cd backend && npm start",
@@ -10,7 +10,13 @@
     "build": "cd frontend && npm run build",
     "production": "cd backend && node server.production.js"
   },
-  "keywords": ["salon", "billing", "customer-management", "whatsapp", "chromeos"],
+  "keywords": [
+    "business",
+    "billing",
+    "customer-management",
+    "whatsapp",
+    "small-business"
+  ],
   "author": "Your Name",
   "license": "MIT"
 }
