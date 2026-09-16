@@ -4,9 +4,10 @@ import {
   Routes,
   Route,
   Link,
+  Outlet,
   useLocation,
 } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
@@ -54,7 +55,7 @@ const navItems = [
 const bottomTabs = ['/', '/new-bill', '/bills', '/customers', '/settings'];
 
 function AppShell() {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout } = require('./context/AuthContext').useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
 
@@ -145,16 +146,7 @@ function AppShell() {
       )}
 
       <main className="content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/new-bill" element={<NewBill />} />
-          <Route path="/bills" element={<Bills />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/items" element={<Items />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <Outlet />
       </main>
 
       <nav className="bottom-nav">
