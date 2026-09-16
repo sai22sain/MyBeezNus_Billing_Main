@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+} from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
@@ -44,7 +51,6 @@ const navItems = [
   { to: '/settings', icon: 'fa-cog', label: 'Settings' },
 ];
 
-// Bottom tab bar shows these 5 items; rest accessible via drawer
 const bottomTabs = ['/', '/new-bill', '/bills', '/customers', '/settings'];
 
 function AppShell() {
@@ -56,12 +62,8 @@ function AppShell() {
     applyTheme(localStorage.getItem('theme') || 'default');
   }, []);
 
-  if (!user) return <Login />;
-  if (!profile) return <Onboarding />;
-
   return (
     <div className="app">
-      {/* Sidebar — desktop */}
       <nav className="sidebar">
         <div className="sidebar-header">
           <Link to="/" title="Go to homepage" style={{ textDecoration: 'none' }}>
@@ -70,19 +72,23 @@ function AppShell() {
               <span className="sidebar-brand-name">MyBeezNus Billing</span>
             </div>
           </Link>
-          <div className="sidebar-salon-name">{profile.businessName}</div>
-          <div className="sidebar-email">{user.email}</div>
+          <div className="sidebar-salon-name">{profile?.businessName}</div>
+          <div className="sidebar-email">{user?.email}</div>
         </div>
         <div className="sidebar-nav-label">Main Menu</div>
         <ul>
           {navItems.map(n => (
-            <li key={n.to}><Link to={n.to} data-label={n.label} className={location.pathname === n.to ? 'active' : ''}><i className={`fas ${n.icon}`}></i>{n.label}</Link></li>
+            <li key={n.to}>
+              <Link to={n.to} data-label={n.label} className={location.pathname === n.to ? 'active' : ''}>
+                <i className={`fas ${n.icon}`}></i>{n.label}
+              </Link>
+            </li>
           ))}
         </ul>
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <img src={user.photoURL} alt={user.displayName} />
-            <span className="sidebar-user-name">{user.displayName}</span>
+            <img src={user?.photoURL} alt={user?.displayName || 'User'} />
+            <span className="sidebar-user-name">{user?.displayName}</span>
           </div>
           <button className="sidebar-signout" onClick={logout}>
             <i className="fas fa-sign-out-alt"></i> Sign Out
@@ -90,7 +96,6 @@ function AppShell() {
         </div>
       </nav>
 
-      {/* Mobile top bar */}
       <div className="mobile-topbar">
         <div className="mobile-topbar-brand">
           <Link to="/" title="Go to homepage" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -103,7 +108,6 @@ function AppShell() {
         </button>
       </div>
 
-      {/* Mobile drawer overlay */}
       {drawerOpen && (
         <div className="drawer-overlay" onClick={() => setDrawerOpen(false)}>
           <nav className="drawer" onClick={e => e.stopPropagation()}>
@@ -120,8 +124,7 @@ function AppShell() {
             <ul style={{ listStyle: 'none', padding: '0 10px' }}>
               {navItems.map(n => (
                 <li key={n.to} style={{ marginBottom: 2 }}>
-                  <Link to={n.to} onClick={() => setDrawerOpen(false)}
-                    style={{ color: 'var(--color-sidebar-text)', textDecoration: 'none', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 8 }}>
+                  <Link to={n.to} onClick={() => setDrawerOpen(false)} style={{ color: 'var(--color-sidebar-text)', textDecoration: 'none', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 8 }}>
                     <i className={`fas ${n.icon}`} style={{ width: 18, textAlign: 'center', color: '#a5b4fc' }}></i>
                     {n.label}
                   </Link>
@@ -130,8 +133,8 @@ function AppShell() {
             </ul>
             <div className="drawer-footer">
               <div className="sidebar-user">
-                <img src={user.photoURL} alt={user.displayName} />
-                <span className="sidebar-user-name">{user.displayName}</span>
+                <img src={user?.photoURL} alt={user?.displayName || 'User'} />
+                <span className="sidebar-user-name">{user?.displayName}</span>
               </div>
               <button className="sidebar-signout" onClick={logout}>
                 <i className="fas fa-sign-out-alt"></i> Sign Out
@@ -154,7 +157,6 @@ function AppShell() {
         </Routes>
       </main>
 
-      {/* Mobile bottom tab bar */}
       <nav className="bottom-nav">
         {navItems.filter(n => bottomTabs.includes(n.to)).map(n => (
           <Link key={n.to} to={n.to} className={`bottom-nav-item${location.pathname === n.to ? ' active' : ''}`}>
@@ -171,11 +173,35 @@ function AppShell() {
   );
 }
 
+function AuthenticatedApp() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route element={<ProtectedRoute requireProfile={false} />}>
+        <Route path="/onboarding" element={<Onboarding />} />
+      </Route>
+      <Route element={<ProtectedRoute requireProfile />}>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/new-bill" element={<NewBill />} />
+          <Route path="/bills" element={<Bills />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/items" element={<Items />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Login />} />
+    </Routes>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <AppShell />
+        <AuthenticatedApp />
       </Router>
     </AuthProvider>
   );
