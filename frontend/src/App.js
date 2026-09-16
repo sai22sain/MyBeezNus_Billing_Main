@@ -1,13 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Link,
-  Outlet,
-  useLocation,
-} from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Link, Outlet, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
@@ -55,7 +48,7 @@ const navItems = [
 const bottomTabs = ['/', '/new-bill', '/bills', '/customers', '/settings'];
 
 function AppShell() {
-  const { user, profile, logout } = require('./context/AuthContext').useAuth();
+  const { user, profile, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
 
@@ -68,135 +61,60 @@ function AppShell() {
       <nav className="sidebar">
         <div className="sidebar-header">
           <Link to="/" title="Go to homepage" style={{ textDecoration: 'none' }}>
-            <div className="sidebar-brand">
-              <Logo size={38} radius={10} />
-              <span className="sidebar-brand-name">MyBeezNus Billing</span>
-            </div>
+            <div className="sidebar-brand"><Logo size={38} radius={10} /><span className="sidebar-brand-name">MyBeezNus Billing</span></div>
           </Link>
           <div className="sidebar-salon-name">{profile?.businessName}</div>
           <div className="sidebar-email">{user?.email}</div>
         </div>
         <div className="sidebar-nav-label">Main Menu</div>
-        <ul>
-          {navItems.map(n => (
-            <li key={n.to}>
-              <Link to={n.to} data-label={n.label} className={location.pathname === n.to ? 'active' : ''}>
-                <i className={`fas ${n.icon}`}></i>{n.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ul>{navItems.map(n => <li key={n.to}><Link to={n.to} data-label={n.label} className={location.pathname === n.to ? 'active' : ''}><i className={`fas ${n.icon}`}></i>{n.label}</Link></li>)}</ul>
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <img src={user?.photoURL} alt={user?.displayName || 'User'} />
-            <span className="sidebar-user-name">{user?.displayName}</span>
-          </div>
-          <button className="sidebar-signout" onClick={logout}>
-            <i className="fas fa-sign-out-alt"></i> Sign Out
-          </button>
+          <div className="sidebar-user"><img src={user?.photoURL} alt={user?.displayName || 'User'} /><span className="sidebar-user-name">{user?.displayName}</span></div>
+          <button className="sidebar-signout" onClick={logout}><i className="fas fa-sign-out-alt"></i> Sign Out</button>
         </div>
       </nav>
 
       <div className="mobile-topbar">
-        <div className="mobile-topbar-brand">
-          <Link to="/" title="Go to homepage" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Logo size={30} radius={8} />
-            <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)' }}>MyBeezNus Billing</span>
-          </Link>
-        </div>
-        <button className="mobile-menu-btn" onClick={() => setDrawerOpen(true)}>
-          <i className="fas fa-bars"></i>
-        </button>
+        <div className="mobile-topbar-brand"><Link to="/" title="Go to homepage" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}><Logo size={30} radius={8} /><span style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)' }}>MyBeezNus Billing</span></Link></div>
+        <button className="mobile-menu-btn" onClick={() => setDrawerOpen(true)}><i className="fas fa-bars"></i></button>
       </div>
 
-      {drawerOpen && (
-        <div className="drawer-overlay" onClick={() => setDrawerOpen(false)}>
-          <nav className="drawer" onClick={e => e.stopPropagation()}>
-            <div className="drawer-header">
-              <Link to="/" onClick={() => setDrawerOpen(false)} title="Go to homepage" style={{ textDecoration: 'none' }}>
-                <div className="sidebar-brand">
-                  <Logo size={34} radius={9} />
-                  <span className="sidebar-brand-name">MyBeezNus Billing</span>
-                </div>
-              </Link>
-              <button className="close-btn" onClick={() => setDrawerOpen(false)}>×</button>
-            </div>
-            <div style={{ padding: '8px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-sidebar-muted)' }}>Menu</div>
-            <ul style={{ listStyle: 'none', padding: '0 10px' }}>
-              {navItems.map(n => (
-                <li key={n.to} style={{ marginBottom: 2 }}>
-                  <Link to={n.to} onClick={() => setDrawerOpen(false)} style={{ color: 'var(--color-sidebar-text)', textDecoration: 'none', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 8 }}>
-                    <i className={`fas ${n.icon}`} style={{ width: 18, textAlign: 'center', color: '#a5b4fc' }}></i>
-                    {n.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <div className="drawer-footer">
-              <div className="sidebar-user">
-                <img src={user?.photoURL} alt={user?.displayName || 'User'} />
-                <span className="sidebar-user-name">{user?.displayName}</span>
-              </div>
-              <button className="sidebar-signout" onClick={logout}>
-                <i className="fas fa-sign-out-alt"></i> Sign Out
-              </button>
-            </div>
-          </nav>
-        </div>
-      )}
+      {drawerOpen && <div className="drawer-overlay" onClick={() => setDrawerOpen(false)}><nav className="drawer" onClick={e => e.stopPropagation()}>
+        <div className="drawer-header"><Link to="/" onClick={() => setDrawerOpen(false)} title="Go to homepage" style={{ textDecoration: 'none' }}><div className="sidebar-brand"><Logo size={34} radius={9} /><span className="sidebar-brand-name">MyBeezNus Billing</span></div></Link><button className="close-btn" onClick={() => setDrawerOpen(false)}>×</button></div>
+        <div style={{ padding: '8px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-sidebar-muted)' }}>Menu</div>
+        <ul style={{ listStyle: 'none', padding: '0 10px' }}>{navItems.map(n => <li key={n.to} style={{ marginBottom: 2 }}><Link to={n.to} onClick={() => setDrawerOpen(false)} style={{ color: 'var(--color-sidebar-text)', textDecoration: 'none', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 8 }}><i className={`fas ${n.icon}`} style={{ width: 18, textAlign: 'center', color: '#a5b4fc' }}></i>{n.label}</Link></li>)}</ul>
+        <div className="drawer-footer"><div className="sidebar-user"><img src={user?.photoURL} alt={user?.displayName || 'User'} /><span className="sidebar-user-name">{user?.displayName}</span></div><button className="sidebar-signout" onClick={logout}><i className="fas fa-sign-out-alt"></i> Sign Out</button></div>
+      </nav></div>}
 
-      <main className="content">
-        <Outlet />
-      </main>
+      <main className="content"><Outlet /></main>
 
-      <nav className="bottom-nav">
-        {navItems.filter(n => bottomTabs.includes(n.to)).map(n => (
-          <Link key={n.to} to={n.to} className={`bottom-nav-item${location.pathname === n.to ? ' active' : ''}`}>
-            <i className={`fas ${n.icon}`}></i>
-            <span>{n.label}</span>
-          </Link>
-        ))}
-        <button className="bottom-nav-item" onClick={() => setDrawerOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-          <i className="fas fa-ellipsis-h"></i>
-          <span>More</span>
-        </button>
-      </nav>
+      <nav className="bottom-nav">{navItems.filter(n => bottomTabs.includes(n.to)).map(n => <Link key={n.to} to={n.to} className={`bottom-nav-item${location.pathname === n.to ? ' active' : ''}`}><i className={`fas ${n.icon}`}></i><span>{n.label}</span></Link>)}<button className="bottom-nav-item" onClick={() => setDrawerOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><i className="fas fa-ellipsis-h"></i><span>More</span></button></nav>
     </div>
   );
 }
 
 function AuthenticatedApp() {
-  return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route element={<ProtectedRoute requireProfile={false} />}>
-        <Route path="/onboarding" element={<Onboarding />} />
+  return <Routes>
+    <Route path="/login" element={<Login />} />
+    <Route element={<ProtectedRoute requireProfile={false} />}><Route path="/onboarding" element={<Onboarding />} /></Route>
+    <Route element={<ProtectedRoute requireProfile />}>
+      <Route element={<AppShell />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/new-bill" element={<NewBill />} />
+        <Route path="/bills" element={<Bills />} />
+        <Route path="/customers" element={<Customers />} />
+        <Route path="/items" element={<Items />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
-      <Route element={<ProtectedRoute requireProfile />}>
-        <Route element={<AppShell />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/new-bill" element={<NewBill />} />
-          <Route path="/bills" element={<Bills />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/items" element={<Items />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
-      </Route>
-      <Route path="*" element={<Login />} />
-    </Routes>
-  );
+    </Route>
+    <Route path="*" element={<Login />} />
+  </Routes>;
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <AuthenticatedApp />
-      </Router>
-    </AuthProvider>
-  );
+  return <AuthProvider><Router><AuthenticatedApp /></Router></AuthProvider>;
 }
 
 export default App;
