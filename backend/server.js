@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
-  'https://mybills.in'
+  'https://mybeeznus.in'
 ].filter(Boolean).map((origin) => origin.replace(/\/$/, ''));
 
 app.use(cors({
@@ -28,13 +28,13 @@ app.use('/api/account', require('./src/routes/account'));
 // Support tickets (customers raise concerns from any MyBeezNus app)
 app.use('/api/support', require('./src/routes/support'));
 
-app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'MyBills.in API running' }));
+app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'MyBeezNus.in API running' }));
 
 // Only start an HTTP server when run directly (node server.js).
 // On Vercel this file is loaded as a serverless function — Vercel invokes
 // `app` as a request handler itself, so listen() must be skipped there.
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`MyBills.in backend running on port ${PORT}`));
+  app.listen(PORT, () => console.log(`MyBeezNus.in backend running on port ${PORT}`));
 }
 
 module.exports = app;

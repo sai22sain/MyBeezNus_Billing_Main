@@ -15,6 +15,7 @@ import Support from './pages/Support';
 import Logo from './components/Logo';
 import HiveBackground from './components/ui/HiveBackground';
 import ToastContainer from './components/Toast/ToastContainer';
+import AppLoadingOverlay from './components/loading/AppLoadingOverlay';
 import './App.css';
 
 const themes = {
@@ -52,7 +53,7 @@ const navItems = [
 const bottomTabs = ['/', '/new-bill', '/bills', '/customers', '/settings'];
 
 function AppShell() {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, loading } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
 
@@ -60,6 +61,8 @@ function AppShell() {
     applyTheme(localStorage.getItem('theme') || 'default');
   }, []);
 
+  // Wait for session/profile bootstrap so transient auth states do not flash.
+  if (loading) return null;
   if (!user) return <Login />;
   if (!profile) return <Onboarding />;
 
@@ -178,12 +181,23 @@ function AppShell() {
 }
 
 function App() {
+  const AppContent = () => {
+    const { loading } = useAuth();
+
+    return (
+      <>
+        <Router>
+          <AppShell />
+          <ToastContainer />
+        </Router>
+        <AppLoadingOverlay visible={loading} />
+      </>
+    );
+  };
+
   return (
     <AuthProvider>
-      <Router>
-        <AppShell />
-        <ToastContainer />
-      </Router>
+      <AppContent />
     </AuthProvider>
   );
 }

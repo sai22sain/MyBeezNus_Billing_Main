@@ -1,0 +1,52 @@
+.app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: rgba(30, 27, 75, 0.18);
+  color: #172554;
+  cursor: wait;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.app-loading-overlay > span {
+  font-size: clamp(13px, 1.5vw, 16px);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.app-loading-overlay__dots {
+  display: inline-block;
+  width: 1.25em;
+  vertical-align: bottom;
+  text-align: left;
+}
+
+.app-loading-overlay__dots::after {
+  content: '.';
+  animation: app-loading-dots 1.5s steps(1, end) infinite;
+}
+
+@keyframes app-loading-dots {
+  0%, 33% { content: '.'; }
+  34%, 66% { content: '..'; }
+  67%, 100% { content: '...'; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-overlay__dots::after {
+    content: '...';
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-loading-overlay > span {
+    font-size: 14px;
+  }
+}
