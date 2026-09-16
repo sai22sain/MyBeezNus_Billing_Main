@@ -11,6 +11,7 @@ import Items from './pages/Items';
 import Reports from './pages/Reports';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
+import Support from './pages/Support';
 import Logo from './components/Logo';
 import HiveBackground from './components/ui/HiveBackground';
 import ToastContainer from './components/Toast/ToastContainer';
@@ -70,11 +71,11 @@ function AppShell() {
         <div className="sidebar-header">
           <Link to="/" title="Go to homepage" style={{ textDecoration: 'none' }}>
             <div className="sidebar-brand">
-              <Logo size={38} radius={10} />
+              <Logo size={52} radius={8} />
               <span className="sidebar-brand-name">MyBeezNus Billing</span>
             </div>
           </Link>
-          <div className="sidebar-salon-name">{profile.businessName}</div>
+          <div className="sidebar-business-name">{profile.businessName}</div>
           <div className="sidebar-email">{user.email}</div>
         </div>
         <div className="sidebar-nav-label">Main Menu</div>
@@ -154,6 +155,7 @@ function AppShell() {
           <Route path="/items" element={<Items />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/support" element={<Support />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
