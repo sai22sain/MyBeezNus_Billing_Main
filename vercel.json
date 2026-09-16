@@ -2,7 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
   "outputDirectory": "frontend/build",
-  "framework": "create-react-app",
   "rewrites": [
     {
       "source": "/api/(.*)",
