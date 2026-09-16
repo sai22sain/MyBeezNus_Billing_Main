@@ -109,11 +109,7 @@ export const customerAPI = {
     const backendRes = await backendPromise;
     let customerId = backendRes?.number;
     if (!customerId) {
-      const { count } = await supabase
-        .from('customers')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', uid);
-      customerId = `${prefix}-${String((count || 0) + 1).padStart(5, '0')}`;
+      throw new Error('Unable to allocate a globally unique customer number. Please try again.');
     }
 
     const { data: row, error } = await supabase
@@ -297,11 +293,7 @@ export const billAPI = {
     const backendRes = await backendPromise;
     let billNumber = backendRes?.number;
     if (!billNumber) {
-      const { count } = await supabase
-        .from('bills')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', uid);
-      billNumber = `${prefix}-${String((count || 0) + 1).padStart(5, '0')}`;
+      throw new Error('Unable to allocate a globally unique bill number. Please try again.');
     }
 
     const { data: row, error } = await supabase

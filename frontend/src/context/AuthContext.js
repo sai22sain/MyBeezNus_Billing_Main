@@ -78,13 +78,26 @@ export function AuthProvider({ children }) {
   const [subscription, setSubscription] = useState({ plan: 'free' });
   const [loading, setLoading] = useState(true);
 
-  const loadUserData = async (sbUser) => {
+  const loadUserData = async (sbUser, verifyUser = false) => {
     if (!sbUser) {
       setUser(null);
       setProfileState(null);
       setSubscription({ plan: 'free' });
       clearReferenceCache();
       return;
+    }
+
+    if (verifyUser) {
+      const { data: verifiedUser, error: userError } = await supabase.auth.getUser();
+      if (userError || !verifiedUser?.user || verifiedUser.user.id !== sbUser.id) {
+        await supabase.auth.signOut({ scope: 'local' });
+        setUser(null);
+        setProfileState(null);
+        setSubscription({ plan: 'free' });
+        clearReferenceCache();
+        return;
+      }
+      sbUser = verifiedUser.user;
     }
     setUser({ uid: sbUser.id, email: sbUser.email, displayName: sbUser.user_metadata?.full_name || sbUser.user_metadata?.name || '', photoURL: sbUser.user_metadata?.avatar_url || '' });
     const [{ data: profileRow }, sub] = await Promise.all([
@@ -97,7 +110,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      loadUserData(data.session?.user || null).finally(() => setLoading(false));
+      loadUserData(data.session?.user || null, true).finally(() => setLoading(false));
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       loadUserData(session?.user || null);
