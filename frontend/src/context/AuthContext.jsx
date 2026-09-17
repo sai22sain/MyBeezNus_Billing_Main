@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { getSubscription } from '../utils/subscription';
 import { clearAll as clearReferenceCache } from '../utils/core/cache';
+import { normalizeInvoiceAccent, normalizeInvoiceTemplate } from '../components/billing/invoiceTemplates';
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -29,6 +30,10 @@ const toProfile = (r) => r && {
   showTaxOnBill: r.show_tax_on_bill,
   showGstOnBill: r.show_gst_on_bill,
   allowBillingWithoutCustomer: r.allow_billing_without_customer === true,
+  inventoryEnabled: r.inventory_enabled === true,
+  allowNegativeStock: r.allow_negative_stock === true,
+  invoiceTemplate: normalizeInvoiceTemplate(r.invoice_template),
+  invoiceAccentColor: normalizeInvoiceAccent(r.invoice_accent_color),
 };
 
 const toDbProfile = (uid, p) => ({
@@ -54,6 +59,10 @@ const toDbProfile = (uid, p) => ({
   show_tax_on_bill: p.showTaxOnBill !== false,
   show_gst_on_bill: p.showGstOnBill === true,
   allow_billing_without_customer: p.allowBillingWithoutCustomer === true,
+  inventory_enabled: p.inventoryEnabled === true,
+  allow_negative_stock: p.allowNegativeStock === true,
+  invoice_template: normalizeInvoiceTemplate(p.invoiceTemplate),
+  invoice_accent_color: normalizeInvoiceAccent(p.invoiceAccentColor),
   updated_at: new Date().toISOString(),
 });
 

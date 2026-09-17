@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { customerAPI, billAPI, itemAPI } from '../utils/firestoreAPI';
 import { useCachedQuery } from '../hooks/useCachedQuery';
 import { cacheKeys } from '../utils/firestoreAPI';
@@ -6,15 +6,19 @@ import { CACHE_TTL } from '../utils/core/cache';
 import { useAuth } from '../context/AuthContext';
 import { isPro, FREE_LIMITS } from '../utils/subscription';
 import { isValidMobile } from '../utils/validation';
+import { unitSupportsDecimal } from '../utils/units';
 import { showToast } from '../services/notificationService';
 import { buildBillMessage, openWhatsApp } from '../utils/whatsapp';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import CustomerForm from '../components/CustomerForm';
 import CustomerContextPanel from '../components/CustomerContextPanel';
 import ResponsiveFormModal from '../components/ui/ResponsiveFormModal';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
+import { calculatePaymentStatus, getPaymentBalance } from '../utils/paymentStatus';
 
 function NewBill() {
   const { user, profile, subscription } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [itemSearch, setItemSearch] = useState('');
@@ -23,6 +27,8 @@ function NewBill() {
   const [billItems, setBillItems] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [dueDate, setDueDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -33,6 +39,66 @@ function NewBill() {
   const [savingMode, setSavingMode] = useState(null);
   const [customerSaving, setCustomerSaving] = useState(false);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+  const itemSearchRef = useRef(null);
+  const [hydratedDraftFor, setHydratedDraftFor] = useState(null);
+
+  const draftKey = user?.uid ? `mybeeznus-new-bill-${user.uid}` : null;
+
+  useEffect(() => {
+    if (!draftKey || hydratedDraftFor === user.uid) return;
+
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+      if (draft) {
+        setSelectedCustomer(draft.selectedCustomer || null);
+        setWalkInCustomer(Boolean(draft.walkInCustomer));
+        setBillItems(Array.isArray(draft.billItems) ? draft.billItems : []);
+        setDiscount(Number(draft.discount) || 0);
+        setPaymentMode(draft.paymentMode || 'Cash');
+        setPaidAmount(Number(draft.paidAmount) || 0);
+        setDueDate(draft.dueDate || '');
+      }
+    } catch {
+      localStorage.removeItem(draftKey);
+    }
+
+    setHydratedDraftFor(user.uid);
+  }, [draftKey, user?.uid, hydratedDraftFor]);
+
+  useEffect(() => {
+    if (!draftKey || hydratedDraftFor !== user.uid) return;
+
+    localStorage.setItem(draftKey, JSON.stringify({
+      selectedCustomer,
+      walkInCustomer,
+      billItems,
+      discount,
+      paymentMode,
+      paidAmount,
+      dueDate,
+    }));
+  }, [draftKey, user?.uid, hydratedDraftFor, selectedCustomer, walkInCustomer, billItems, discount, paymentMode, paidAmount, dueDate]);
+
+  useEffect(() => {
+    if (hydratedDraftFor === user?.uid && location.state?.customer?.id) {
+      setSelectedCustomer(location.state.customer);
+      setWalkInCustomer(false);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [hydratedDraftFor, user?.uid, location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    const focusItemSearch = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        itemSearchRef.current?.focus();
+        itemSearchRef.current?.select();
+      }
+    };
+
+    document.addEventListener('keydown', focusItemSearch);
+    return () => document.removeEventListener('keydown', focusItemSearch);
+  }, []);
 
   // Reference data served from the shared per-user cache (5-min cats,
   // 2-min active items). Mutations on other pages invalidate it.
@@ -72,7 +138,15 @@ function NewBill() {
   const addItemToBill = (item) => {
     const ex = billItems.findIndex(bi => bi.itemId === item.id);
     if (ex >= 0) setBillItems(billItems.map((bi, i) => i === ex ? { ...bi, quantity: bi.quantity + 1 } : bi));
-    else setBillItems([...billItems, { itemId: item.id, name: item.name, price: item.price, tax: item.tax || 0, quantity: 1 }]);
+    else setBillItems([...billItems, { itemId: item.id, name: item.name, price: item.price, tax: item.tax || 0, quantity: 1, unit: item.unit, trackInventory: item.trackInventory }]);
+  };
+
+  const parseQuantity = value => Number(String(value).replace(',', '.')) || 0;
+
+  const updateQuantityInput = (idx, value) => {
+    const normalizedValue = String(value).replace(',', '.');
+    if (!/^\d*(?:\.\d*)?$/.test(normalizedValue)) return;
+    setBillItems(billItems.map((bi, i) => i === idx ? { ...bi, quantity: normalizedValue } : bi));
   };
 
   const updateQuantity = (idx, qty) => {
@@ -83,7 +157,7 @@ function NewBill() {
   const calculateTotals = () => {
     let subtotal = 0, tax = 0;
     billItems.forEach(item => {
-      const t = item.price * item.quantity;
+      const t = item.price * parseQuantity(item.quantity);
       subtotal += t;
       tax += (t * (item.tax || 0)) / 100;
     });
@@ -102,6 +176,9 @@ function NewBill() {
   const createBill = async (sendWhatsApp = false) => {
     if (!selectedCustomer && !walkInCustomer && !profile?.allowBillingWithoutCustomer) return showToast({ type: 'warning', message: 'Please select a customer.' });
     if (billItems.length === 0) return showToast({ type: 'warning', message: 'Please add items to the bill.' });
+    const totals = calculateTotals();
+    const normalizedPaidAmount = Math.max(0, Number(paidAmount) || 0);
+    if (normalizedPaidAmount > totals.finalTotal) return showToast({ type: 'warning', message: 'Paid amount must be between ₹0 and the total payable amount.' });
     if (saving) return;
     setSaving(true);
     setSavingMode(sendWhatsApp ? 'whatsapp' : 'save');
@@ -117,14 +194,13 @@ function NewBill() {
     }
 
     try {
-      const totals = calculateTotals();
       const result = await billAPI.create(user.uid, {
         customerId: selectedCustomer?.id || null,
         customerName: selectedCustomer?.name || 'Walk-in customer',
         customerMobile: selectedCustomer?.mobile || '',
-        items: billItems, discount, paymentMode,
+        items: billItems, discount, paymentMode, paidAmount: normalizedPaidAmount, dueDate,
         totalAmount: totals.subtotal, tax: totals.tax, finalAmount: totals.finalTotal
-      }, { billPrefix: profile?.billPrefix });
+      }, { billPrefix: profile?.billPrefix, inventoryEnabled: profile?.inventoryEnabled === true });
       showToast({ type: 'success', message: `Bill ${result.billNumber} saved successfully.` });
       if (sendWhatsApp) {
         if (!selectedCustomer) {
@@ -137,7 +213,8 @@ function NewBill() {
           else showToast({ type: 'warning', message: "Bill saved successfully. WhatsApp isn't available on this device." });
         }
       }
-      setSelectedCustomer(null); setWalkInCustomer(false); setBillItems([]); setDiscount(0); setPaymentMode('Cash');
+      setSelectedCustomer(null); setWalkInCustomer(false); setBillItems([]); setDiscount(0); setPaymentMode('Cash'); setPaidAmount(0); setDueDate('');
+      if (draftKey) localStorage.removeItem(draftKey);
       setCustomerRefreshKey(key => key + 1);
     } catch { showToast({ type: 'error', message: 'Unable to save the bill. Please try again.' }); }
     finally { setSaving(false); setSavingMode(null); }
@@ -149,6 +226,8 @@ function NewBill() {
   ), [items, selectedCategory, itemSearch]);
 
   const totals = calculateTotals();
+  const paymentBalance = getPaymentBalance(totals.finalTotal, paidAmount);
+  const paymentStatus = calculatePaymentStatus(totals.finalTotal, paidAmount, dueDate);
 
   return (
     <div className="billing-page">
@@ -173,8 +252,8 @@ function NewBill() {
           <label className="billing-search">
             <i className="fas fa-search"></i>
             <span className="sr-only">Search items</span>
-            <input type="search" placeholder="Search items or category..." value={itemSearch} onChange={e => setItemSearch(e.target.value)} />
-            <kbd>⌘ K</kbd>
+            <input ref={itemSearchRef} type="search" placeholder="Search items or category..." value={itemSearch} onChange={e => setItemSearch(e.target.value)} />
+            <kbd>Ctrl/Cmd K</kbd>
           </label>
           <div className="billing-category-filter" aria-label="Filter items by category">
             <button type="button" className={!selectedCategory ? 'active' : ''} onClick={() => setSelectedCategory(null)}>All</button>
@@ -183,7 +262,7 @@ function NewBill() {
           <div className="billing-catalog-list">
             {filteredItems.map(item => <button type="button" key={item.id} className="billing-item-tile" onClick={() => addItemToBill(item)}>
               <span className="billing-item-tile-icon"><i className="fas fa-plus"></i></span>
-              <span className="billing-item-tile-copy"><strong>{item.name}</strong><small>{item.categoryName || 'Item'}{item.tax ? ` · ${item.tax}% tax` : ''}</small></span>
+              <span className="billing-item-tile-copy"><strong>{item.name}</strong><small>{item.categoryName || 'Item'}{item.tax ? ` · ${item.tax}% tax` : ''}</small>{profile?.inventoryEnabled === true && item.trackInventory && <small className={item.stockQuantity <= item.lowStockThreshold ? 'billing-stock-warning' : 'billing-stock-available'}><i className="fas fa-boxes-stacked"></i> Stock: {item.stockQuantity} {item.unit || ''}{item.stockQuantity <= item.lowStockThreshold ? ' · Low' : ''}</small>}</span>
               <span className="billing-item-tile-price">₹{Number(item.price).toFixed(0)}</span>
             </button>)}
             {filteredItems.length === 0 && !itemSearch && <div className="billing-catalog-empty"><i className="fas fa-box-open"></i><strong>No items available</strong><span>Add your first item to start billing.</span><button type="button" className="billing-inline-link" onClick={() => navigate('/items')}>Add item <i className="fas fa-arrow-right"></i></button></div>}
@@ -192,7 +271,7 @@ function NewBill() {
         </section>
 
         <section className="billing-invoice" aria-labelledby="invoice-title">
-          <div className="billing-section-heading billing-invoice-heading"><div><span className="billing-eyebrow">Live preview</span><h2 id="invoice-title">Current bill</h2></div><span className="billing-item-count">{billItems.reduce((sum, item) => sum + item.quantity, 0)} items</span></div>
+          <div className="billing-section-heading billing-invoice-heading"><div><span className="billing-eyebrow">Live preview</span><h2 id="invoice-title">Current bill</h2></div><span className="billing-item-count">{billItems.reduce((sum, item) => sum + parseQuantity(item.quantity), 0)} items</span></div>
           <div className="billing-customer-row">
             <div className="billing-customer-label"><span className="billing-eyebrow">Customer</span>{selectedCustomer ? <strong>{selectedCustomer.name}</strong> : walkInCustomer ? <strong>Walk-in customer</strong> : <strong>Select a customer</strong>}{selectedCustomer && <small>{selectedCustomer.mobile || 'No mobile number'}</small>}{walkInCustomer && <small>No customer attached</small>}</div>
             {selectedCustomer || walkInCustomer ? <button type="button" className="billing-text-button" onClick={() => { setSelectedCustomer(null); setWalkInCustomer(false); }}>Change</button> : <button type="button" className="billing-text-button" onClick={() => setShowCustomerModal(true)}><i className="fas fa-user-plus"></i> Add new</button>}
@@ -202,12 +281,12 @@ function NewBill() {
           <div className="billing-items-area">
             {billItems.length === 0 ? <div className="billing-empty-invoice"><i className="fas fa-receipt"></i><strong>Your bill is empty</strong><span>Select an item from the catalog to get started.</span></div> : <>
               <div className="billing-items-head"><span>Item</span><span>Rate</span><span>Qty</span><span>Amount</span><span></span></div>
-              <div className="billing-invoice-items">{billItems.map((item, idx) => <div key={idx} className="billing-invoice-item"><div className="billing-invoice-item-name"><strong>{item.name}</strong>{item.tax ? <small>{item.tax}% tax included</small> : null}</div><input aria-label={`${item.name} price`} type="number" value={item.price} onChange={e => setBillItems(billItems.map((bi, i) => i === idx ? { ...bi, price: parseFloat(e.target.value) || 0 } : bi))} /><div className="billing-quantity"><button type="button" aria-label={`Decrease ${item.name} quantity`} onClick={() => updateQuantity(idx, item.quantity - 1)}>−</button><span>{item.quantity}</span><button type="button" aria-label={`Increase ${item.name} quantity`} onClick={() => updateQuantity(idx, item.quantity + 1)}>+</button></div><strong className="billing-line-total">₹{(item.price * item.quantity).toFixed(2)}</strong><button type="button" className="billing-remove-item" aria-label={`Remove ${item.name}`} onClick={() => updateQuantity(idx, 0)}>×</button></div>)}</div>
+              <div className="billing-invoice-items">{billItems.map((item, idx) => <div key={idx} className="billing-invoice-item"><div className="billing-invoice-item-name"><strong>{item.name}</strong>{item.unit ? <small>Unit: {item.unit}</small> : null}{item.tax ? <small>{item.tax}% tax included</small> : null}</div><input aria-label={`${item.name} price`} type="number" value={item.price} onChange={e => setBillItems(billItems.map((bi, i) => i === idx ? { ...bi, price: parseFloat(e.target.value) || 0 } : bi))} /><div className="billing-quantity"><button type="button" aria-label={`Decrease ${item.name} quantity`} onClick={() => updateQuantity(idx, parseQuantity(item.quantity) - (unitSupportsDecimal(item.unit) ? 0.1 : 1))}>−</button><input className="billing-quantity-input" aria-label={`${item.name} quantity`} type="text" inputMode="decimal" value={item.quantity} onChange={e => updateQuantityInput(idx, e.target.value)} /><button type="button" aria-label={`Increase ${item.name} quantity`} onClick={() => updateQuantity(idx, parseQuantity(item.quantity) + (unitSupportsDecimal(item.unit) ? 0.1 : 1))}>+</button></div><strong className="billing-line-total">₹{(item.price * parseQuantity(item.quantity)).toFixed(2)}</strong><button type="button" className="billing-remove-item" aria-label={`Remove ${item.name}`} onClick={() => updateQuantity(idx, 0)}>×</button></div>)}</div>
             </>}
           </div>
 
           <div className="billing-summary"><div className="billing-summary-row"><span>Subtotal</span><strong>₹{totals.subtotal.toFixed(2)}</strong></div><div className="billing-summary-row"><span>Tax</span><strong>₹{totals.tax.toFixed(2)}</strong></div><div className="billing-summary-row billing-discount-row"><label htmlFor="bill-discount">Discount</label><input id="bill-discount" type="number" min="0" value={discount} onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} placeholder="0" /></div><div className="billing-total"><span>Total payable</span><strong>₹{Math.max(0, totals.finalTotal).toFixed(2)}</strong></div></div>
-          <div className="billing-payment"><span className="billing-eyebrow">Payment method</span><div className="billing-payment-options">{['Cash', 'UPI', 'Card'].map(mode => <button type="button" key={mode} className={paymentMode === mode ? 'active' : ''} onClick={() => setPaymentMode(mode)}><i className={`fas ${mode === 'Cash' ? 'fa-money-bill' : mode === 'UPI' ? 'fa-mobile-screen-button' : 'fa-credit-card'}`}></i>{mode}</button>)}</div></div>
+          <div className="billing-payment"><span className="billing-eyebrow">Payment</span><div className="billing-payment-options">{['Cash', 'UPI', 'Card'].map(mode => <button type="button" key={mode} className={paymentMode === mode ? 'active' : ''} onClick={() => setPaymentMode(mode)}><i className={`fas ${mode === 'Cash' ? 'fa-money-bill' : mode === 'UPI' ? 'fa-mobile-screen-button' : 'fa-credit-card'}`}></i>{mode}</button>)}</div><div className="billing-payment-fields"><label>Amount paid<input type="number" min="0" max={Math.max(0, totals.finalTotal)} step="0.01" value={paidAmount} onFocus={e => e.target.select()} onChange={e => setPaidAmount(e.target.value)} /></label><label>Due date<input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></label></div><div className="billing-payment-breakdown"><span>Total <strong>₹{Math.max(0, totals.finalTotal).toFixed(2)}</strong></span><span>Balance <strong>₹{paymentBalance.toFixed(2)}</strong></span><PaymentStatusBadge status={paymentStatus} /></div></div>
           <div className="billing-actions"><button type="button" className="billing-save-button" onClick={() => createBill(false)} disabled={saving}><i className={`fas ${savingMode === 'save' ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>{savingMode === 'save' ? 'Saving...' : 'Save bill'}</button><button type="button" className="billing-whatsapp-button" onClick={() => createBill(true)} disabled={saving}><i className={`fab ${savingMode === 'whatsapp' ? 'fa-spinner fa-spin' : 'fa-whatsapp'}`}></i>{savingMode === 'whatsapp' ? 'Saving & preparing...' : 'Save & send via WhatsApp'}</button></div>
         </section>
 

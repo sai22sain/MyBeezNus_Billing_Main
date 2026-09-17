@@ -19,6 +19,7 @@ const toCustomer = (r) => r && {
   customerId: r.customer_id,
   name: r.name,
   mobile: r.mobile,
+  email: r.email || '',
   dob: r.dob,
   gender: r.gender,
   address: r.address || '',
@@ -35,6 +36,13 @@ const toItem = (r, catName = '') => r && {
   price: Number(r.price),
   tax: Number(r.tax),
   isActive: r.is_active,
+  itemType: r.item_type || 'SERVICE',
+  trackInventory: r.track_inventory === true,
+  stockQuantity: Number(r.stock_quantity || 0),
+  unit: r.unit || 'pcs',
+  lowStockThreshold: Number(r.low_stock_threshold || 0),
+  sku: r.sku || '',
+  purchasePrice: Number(r.purchase_price || 0),
   createdAt: r.created_at,
 };
 
@@ -50,8 +58,21 @@ const toBill = (r) => r && {
   discount: Number(r.discount),
   paymentMode: r.payment_mode,
   totalAmount: Number(r.total_amount),
+  paidAmount: Number(r.paid_amount || 0),
+  dueDate: r.due_date || '',
   tax: Number(r.tax),
   finalAmount: Number(r.final_amount),
+  createdAt: r.created_at,
+};
+
+const toPaymentTransaction = (r) => r && {
+  id: r.id,
+  billId: r.bill_id,
+  customerId: r.customer_id,
+  amount: Number(r.amount || 0),
+  paymentMode: r.payment_mode || 'Cash',
+  paymentDate: r.payment_date,
+  notes: r.notes || '',
   createdAt: r.created_at,
 };
 
@@ -122,6 +143,7 @@ export const customerAPI = {
         customer_id: customerId,
         name: data.name || '',
         mobile: data.mobile || '',
+        email: data.email?.trim() || null,
         dob: data.dob || '',
         gender: data.gender || '',
         address: data.address || '',
@@ -139,6 +161,7 @@ export const customerAPI = {
       .update({
         name: data.name,
         mobile: data.mobile,
+        email: data.email?.trim() || null,
         dob: data.dob,
         gender: data.gender,
         address: data.address || '',
@@ -167,25 +190,101 @@ export const customerAPI = {
     if (error) throw error;
     return (data || []).map(toBill);
   },
+  getDetails: async (uid, customerId) => {
+    const [{ data: customerRow, error: customerError }, { data: billRows, error: billsError }, { data: paymentRows, error: paymentsError }] = await Promise.all([
+      supabase.from('customers').select('*').eq('user_id', uid).eq('id', customerId).maybeSingle(),
+      supabase.from('bills').select('*').eq('user_id', uid).eq('customer_id', customerId).order('created_at', { ascending: false }),
+      supabase.from('payment_transactions').select('*').eq('user_id', uid).eq('customer_id', customerId).order('payment_date', { ascending: false }).order('created_at', { ascending: false }),
+    ]);
+    if (customerError) throw customerError;
+    if (billsError) throw billsError;
+    if (paymentsError) throw paymentsError;
+
+    const bills = (billRows || []).map(toBill);
+    const payments = (paymentRows || []).map(toPaymentTransaction);
+    const paidByBill = payments.reduce((result, payment) => {
+      result[payment.billId] = (result[payment.billId] || 0) + payment.amount;
+      return result;
+    }, {});
+    const today = new Date().toLocaleDateString('en-CA');
+    const billsWithPayments = bills.map(bill => ({
+      ...bill,
+      paidAmount: paidByBill[bill.id] ?? bill.paidAmount,
+    }));
+    const totalSpent = billsWithPayments.reduce((sum, bill) => sum + bill.finalAmount, 0);
+    const totalPaid = payments.length
+      ? payments.reduce((sum, payment) => sum + payment.amount, 0)
+      : billsWithPayments.reduce((sum, bill) => sum + bill.paidAmount, 0);
+    const outstanding = billsWithPayments.reduce((sum, bill) => sum + Math.max(0, bill.finalAmount - bill.paidAmount), 0);
+    const overdue = billsWithPayments.reduce((sum, bill) => {
+      const balance = Math.max(0, bill.finalAmount - bill.paidAmount);
+      return sum + (balance > 0 && bill.dueDate && bill.dueDate < today ? balance : 0);
+    }, 0);
+
+    return {
+      customer: toCustomer(customerRow),
+      bills: billsWithPayments,
+      payments,
+      summary: { totalBills: bills.length, totalSpent, totalPaid, outstanding, overdue },
+    };
+  },
   getSummary: async (uid, customerId) => {
     const { data, error, count } = await supabase
       .from('bills')
-      .select('id,bill_number,final_amount,created_at', { count: 'exact' })
+      .select('id,bill_number,final_amount,paid_amount,due_date,created_at', { count: 'exact' })
       .eq('user_id', uid)
       .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-      .limit(5);
+      .order('created_at', { ascending: false });
     if (error) throw error;
     const bills = data || [];
+    const billIds = bills.map(bill => bill.id);
+    const { data: payments, error: paymentError } = billIds.length
+      ? await supabase.from('payment_transactions').select('bill_id,amount').eq('user_id', uid).in('bill_id', billIds)
+      : { data: [], error: null };
+    if (paymentError) throw paymentError;
+    const paidByBill = (payments || []).reduce((result, payment) => {
+      result[payment.bill_id] = (result[payment.bill_id] || 0) + Number(payment.amount || 0);
+      return result;
+    }, {});
+    const today = new Date().toLocaleDateString('en-CA');
+    const totalOutstanding = bills.reduce((sum, bill) => sum + Math.max(0, Number(bill.final_amount || 0) - (paidByBill[bill.id] ?? Number(bill.paid_amount || 0))), 0);
+    const overdueOutstanding = bills.reduce((sum, bill) => {
+      const balance = Math.max(0, Number(bill.final_amount || 0) - (paidByBill[bill.id] ?? Number(bill.paid_amount || 0)));
+      return sum + (balance > 0 && bill.due_date && bill.due_date < today ? balance : 0);
+    }, 0);
     return {
       totalBills: count || 0,
-      recentBills: bills.map(bill => ({
+      totalOutstanding,
+      overdueOutstanding,
+      recentBills: bills.slice(0, 5).map(bill => ({
         id: bill.id,
         billNumber: bill.bill_number,
         finalAmount: Number(bill.final_amount || 0),
         createdAt: bill.created_at,
       })),
     };
+  },
+  getReceivables: async (uid) => {
+    const [{ data: bills, error: billsError }, { data: payments, error: paymentsError }] = await Promise.all([
+      supabase.from('bills').select('id,customer_id,customer_name,final_amount,paid_amount,due_date,created_at').eq('user_id', uid).not('customer_id', 'is', null),
+      supabase.from('payment_transactions').select('bill_id,customer_id,amount').eq('user_id', uid),
+    ]);
+    if (billsError) throw billsError;
+    if (paymentsError) throw paymentsError;
+    const paidByBill = (payments || []).reduce((result, payment) => {
+      result[payment.bill_id] = (result[payment.bill_id] || 0) + Number(payment.amount || 0);
+      return result;
+    }, {});
+    const today = new Date().toLocaleDateString('en-CA');
+    return (bills || []).reduce((result, bill) => {
+      const paid = paidByBill[bill.id] ?? Number(bill.paid_amount || 0);
+      const balance = Math.max(0, Number(bill.final_amount || 0) - paid);
+      if (!result[bill.customer_id]) result[bill.customer_id] = { totalOutstanding: 0, overdueOutstanding: 0, billCount: 0 };
+      result[bill.customer_id].totalOutstanding += balance;
+      result[bill.customer_id].overdueOutstanding += balance > 0 && bill.due_date && bill.due_date < today ? balance : 0;
+      result[bill.customer_id].billCount += 1;
+      return result;
+    }, {});
   },
   getBirthdays: async (uid) => {
     const today = new Date();
@@ -225,6 +324,13 @@ export const itemAPI = {
       price: data.price || 0,
       tax: data.tax || 0,
       is_active: data.isActive !== false,
+      item_type: data.itemType || 'SERVICE',
+      track_inventory: data.trackInventory === true,
+      stock_quantity: data.stockQuantity || 0,
+      unit: data.unit || 'pcs',
+      low_stock_threshold: data.lowStockThreshold || 0,
+      sku: data.sku || null,
+      purchase_price: data.purchasePrice || 0,
     });
     if (error) throw error;
   },
@@ -237,6 +343,13 @@ export const itemAPI = {
         price: data.price || 0,
         tax: data.tax || 0,
         is_active: data.isActive !== false,
+        item_type: data.itemType || 'SERVICE',
+        track_inventory: data.trackInventory === true,
+        stock_quantity: Number(data.stockQuantity) || 0,
+        unit: data.unit || 'pcs',
+        low_stock_threshold: Number(data.lowStockThreshold) || 0,
+        sku: data.sku || null,
+        purchase_price: data.purchasePrice || 0,
       })
       .eq('user_id', uid)
       .eq('id', id);
@@ -259,6 +372,19 @@ export const itemAPI = {
       .eq('id', id);
     if (error) throw error;
     invalidateReferenceCache(uid);
+  },
+  applyStockMovement: async (uid, itemId, quantity, movementType, notes = '', billId = null) => {
+    const { data, error } = await supabase.rpc('apply_stock_movement', {
+      p_user_id: uid,
+      p_item_id: itemId,
+      p_quantity: Number(quantity),
+      p_movement_type: movementType,
+      p_bill_id: billId,
+      p_notes: notes || null,
+    });
+    if (error) throw error;
+    invalidateReferenceCache(uid);
+    return data;
   },
   getCategories: (uid) =>
     cachedFetch(uid, cacheKeys.categories, CACHE_TTL.categories, async () => {
@@ -300,7 +426,19 @@ export const billAPI = {
       .eq('user_id', uid)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(toBill);
+    const billIds = (data || []).map(bill => bill.id);
+    const { data: payments, error: paymentError } = billIds.length
+      ? await supabase.from('payment_transactions').select('bill_id,amount').eq('user_id', uid).in('bill_id', billIds)
+      : { data: [], error: null };
+    if (paymentError) throw paymentError;
+    const paidByBill = (payments || []).reduce((result, payment) => {
+      result[payment.bill_id] = (result[payment.bill_id] || 0) + Number(payment.amount || 0);
+      return result;
+    }, {});
+    return (data || []).map(bill => toBill({
+      ...bill,
+      paid_amount: paidByBill[bill.id] ?? bill.paid_amount,
+    }));
   },
   getById: async (uid, id) => {
     const { data, error } = await supabase
@@ -330,6 +468,16 @@ export const billAPI = {
       throw new Error('Unable to allocate your bill number. Please try again.');
     }
 
+    const billItems = Array.isArray(data.items) ? data.items : [];
+    const itemIds = [...new Set(billItems.map(item => item.itemId).filter(Boolean))];
+    const { data: inventoryItems, error: inventoryError } = itemIds.length
+      ? await supabase.from('items').select('id,track_inventory').eq('user_id', uid).in('id', itemIds)
+      : { data: [], error: null };
+    if (inventoryError) throw inventoryError;
+    const inventoryItemIds = opts.inventoryEnabled === true
+      ? new Set((inventoryItems || []).filter(item => item.track_inventory).map(item => item.id))
+      : new Set();
+
     const { data: row, error } = await supabase
       .from('bills')
       .insert({
@@ -338,16 +486,49 @@ export const billAPI = {
         customer_id: data.customerId || null,
         customer_name: data.customerName || '',
         customer_mobile: data.customerMobile || '',
-        items: data.items || [],
+        items: billItems,
         discount: data.discount || 0,
         payment_mode: data.paymentMode || 'Cash',
         total_amount: data.totalAmount || 0,
+        paid_amount: data.paidAmount || 0,
+        due_date: data.dueDate || null,
         tax: data.tax || 0,
         final_amount: data.finalAmount || 0,
       })
       .select()
       .single();
     if (error) throw error;
+    if (Number(data.paidAmount || 0) > 0) {
+      try {
+        await billAPI.recordPayment(uid, row.id, {
+          amount: Number(data.paidAmount),
+          paymentMode: data.paymentMode || 'Cash',
+          paymentDate: new Date().toLocaleDateString('en-CA'),
+        });
+      } catch (paymentError) {
+        await supabase.from('bills').delete().eq('user_id', uid).eq('id', row.id);
+        throw paymentError;
+      }
+    }
+    const inventoryQuantities = billItems.reduce((result, item) => {
+      if (!item.itemId || !inventoryItemIds.has(item.itemId)) return result;
+      const quantity = Number(String(item.quantity ?? 0).replace(',', '.'));
+      if (quantity > 0) result[item.itemId] = (result[item.itemId] || 0) + quantity;
+      return result;
+    }, {});
+    const appliedMovements = [];
+    try {
+      for (const [itemId, quantity] of Object.entries(inventoryQuantities)) {
+        const movement = await itemAPI.applyStockMovement(uid, itemId, -quantity, 'SALE', `Sale ${billNumber}`, row.id);
+        appliedMovements.push({ itemId, quantity, movement });
+      }
+    } catch (stockError) {
+      for (const movement of appliedMovements) {
+        await itemAPI.applyStockMovement(uid, movement.itemId, movement.quantity, 'SALE_REVERSAL', `Rollback sale ${billNumber}`, row.id);
+      }
+      await supabase.from('bills').delete().eq('user_id', uid).eq('id', row.id);
+      throw stockError;
+    }
     return { id: row.id, billNumber };
   },
   update: async (uid, id, data) => {
@@ -359,6 +540,8 @@ export const billAPI = {
         discount: data.discount,
         payment_mode: data.paymentMode,
         total_amount: data.totalAmount,
+        paid_amount: data.paidAmount,
+        due_date: data.dueDate || null,
         tax: data.tax,
         final_amount: data.finalAmount,
       })
@@ -373,6 +556,29 @@ export const billAPI = {
       .eq('user_id', uid)
       .eq('id', id);
     if (error) throw error;
+  },
+  getPayments: async (uid, billId) => {
+    const { data, error } = await supabase
+      .from('payment_transactions')
+      .select('*')
+      .eq('user_id', uid)
+      .eq('bill_id', billId)
+      .order('payment_date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toPaymentTransaction);
+  },
+  recordPayment: async (uid, billId, payment) => {
+    const { data, error } = await supabase.rpc('record_payment', {
+      p_user_id: uid,
+      p_bill_id: billId,
+      p_amount: Number(payment.amount),
+      p_payment_mode: payment.paymentMode || 'Cash',
+      p_payment_date: payment.paymentDate || new Date().toLocaleDateString('en-CA'),
+      p_notes: payment.notes || null,
+    });
+    if (error) throw error;
+    return toPaymentTransaction(data);
   }
 };
 

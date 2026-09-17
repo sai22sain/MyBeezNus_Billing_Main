@@ -9,6 +9,7 @@ import NewBill from './pages/NewBill';
 import Bills from './pages/Bills';
 import BillDetails from './pages/BillDetails';
 import Customers from './pages/Customers';
+import CustomerDetails from './pages/CustomerDetails';
 import Items from './pages/Items';
 import Reports from './pages/Reports';
 import Pricing from './pages/Pricing';
@@ -113,6 +114,7 @@ function AuthenticatedApp() {
         <Route path="/bills" element={<Bills />} />
         <Route path="/bills/:billId" element={<BillDetails />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/:customerId" element={<CustomerDetails />} />
         <Route path="/items" element={<Items />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/pricing" element={<Pricing />} />

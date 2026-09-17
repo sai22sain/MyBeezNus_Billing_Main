@@ -3,17 +3,26 @@ import { useAuth } from '../context/AuthContext';
 import { isValidMobile, isValidEmail, isValidPincode, isValidGst } from '../utils/validation';
 import { showToast, showConfirmation } from '../services/notificationService';
 import { backendAPI } from '../utils/backend';
+import BillDocument from '../components/billing/BillDocument';
+import { INVOICE_ACCENT_PRESETS, INVOICE_TEMPLATES, DEFAULT_INVOICE_ACCENT, DEFAULT_INVOICE_TEMPLATE, normalizeInvoiceAccent, normalizeInvoiceTemplate } from '../components/billing/invoiceTemplates';
 
-const SECTION = ({ icon, title, subtitle, children }) => (
-  <div className="settings-section">
-    <div className="settings-section-header">
+const SECTION = ({ id, icon, title, subtitle, isOpen, onToggle, children }) => (
+  <div className={`settings-section ${isOpen ? 'is-open' : 'is-collapsed'}`}>
+    <button
+      type="button"
+      className="settings-section-header"
+      onClick={() => onToggle(id)}
+      aria-expanded={isOpen}
+      aria-controls={`settings-section-body-${id}`}
+    >
       <div className="settings-section-icon"><i className={`fas ${icon}`}></i></div>
       <div>
         <div className="settings-section-title">{title}</div>
         {subtitle && <div className="settings-section-sub">{subtitle}</div>}
       </div>
-    </div>
-    <div className="settings-section-body">{children}</div>
+      <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} settings-section-chevron`} aria-hidden="true"></i>
+    </button>
+    {isOpen && <div id={`settings-section-body-${id}`} className="settings-section-body">{children}</div>}
   </div>
 );
 
@@ -32,9 +41,14 @@ function Settings() {
     whatsappNumber: '', whatsappMessage: '',
     showTaxOnBill: true, showGstOnBill: false,
     allowBillingWithoutCustomer: false,
+    inventoryEnabled: false, allowNegativeStock: false,
+    invoiceTemplate: DEFAULT_INVOICE_TEMPLATE,
+    invoiceAccentColor: DEFAULT_INVOICE_ACCENT,
   });
   const [saving, setSaving] = useState(false);
+  const [invoiceSaving, setInvoiceSaving] = useState(false);
   const [pincodeStatus, setPincodeStatus] = useState('');
+  const [openSection, setOpenSection] = useState('business');
 
   useEffect(() => {
     // Profile is loaded by AuthContext; sync it into the form
@@ -77,6 +91,43 @@ function Settings() {
   }, [form.pincode]);
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+  const toggleSection = sectionId => setOpenSection(previous => previous === sectionId ? '' : sectionId);
+
+  const previewBill = {
+    billNumber: 'BILL-00011',
+    createdAt: '2026-09-17T10:00:00.000Z',
+    dueDate: '2026-09-24',
+    customerName: 'Aarav Mehta',
+    customerMobile: '+91 98765 43210',
+    items: [
+      { name: 'Signature service', quantity: 1, price: 850, tax: 18 },
+      { name: 'Finishing touch', quantity: 2, price: 120, tax: 0 },
+    ],
+    totalAmount: 1090,
+    discount: 0,
+    tax: 177,
+    finalAmount: 1267,
+    paidAmount: 1267,
+    paymentMode: 'UPI',
+  };
+
+  const previewProfile = { ...form, invoiceTemplate: normalizeInvoiceTemplate(form.invoiceTemplate), invoiceAccentColor: normalizeInvoiceAccent(form.invoiceAccentColor) };
+
+  const saveInvoicePreferences = async () => {
+    setInvoiceSaving(true);
+    const preferences = {
+      invoiceTemplate: normalizeInvoiceTemplate(form.invoiceTemplate),
+      invoiceAccentColor: normalizeInvoiceAccent(form.invoiceAccentColor),
+    };
+    try {
+      await setProfile({ ...profile, ...preferences });
+      showToast({ type: 'success', message: 'Invoice preferences saved.' });
+    } catch {
+      showToast({ type: 'error', message: 'Unable to save invoice preferences. Please try again.' });
+    } finally {
+      setInvoiceSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     // ---- validation ----
@@ -112,8 +163,7 @@ function Settings() {
     const payload = { ...form, defaultTax: tax };
     setSaving(true);
     try {
-      await backendAPI.updateProfile(payload);
-      setProfile(previous => ({ ...previous, ...payload }));
+      await setProfile({ ...profile, ...payload });
       showToast({ type: 'success', message: 'Settings saved successfully.' });
     } catch (error) {
       showToast({ type: 'error', message: error.message || 'Could not save settings.' });
@@ -143,7 +193,7 @@ function Settings() {
   return (
     <div className="settings-page">
       {/* Business Info */}
-      <SECTION icon="fa-store" title="Business Information" subtitle="Shown on bills and receipts">
+      <SECTION id="business" isOpen={openSection === 'business'} onToggle={toggleSection} icon="fa-store" title="Business Information" subtitle="Shown on bills and receipts">
         <Row>
           <div className="form-group">
             <label>Business Name *</label>
@@ -212,7 +262,7 @@ function Settings() {
       </SECTION>
 
       {/* Billing Settings */}
-      <SECTION icon="fa-receipt" title="Billing Preferences" subtitle="Configure how bills are generated">
+      <SECTION id="billing" isOpen={openSection === 'billing'} onToggle={toggleSection} icon="fa-receipt" title="Billing Preferences" subtitle="Configure how bills are generated">
         <Row>
           <div className="form-group">
             <label>Bill Number Prefix</label>
@@ -262,11 +312,52 @@ function Settings() {
             <span className="toggle-track"><span className="toggle-thumb"></span></span>
             <span className="toggle-label">Show GST number on bill</span>
           </label>
+          <label className="settings-toggle">
+            <input type="checkbox" checked={form.inventoryEnabled === true} onChange={e => set('inventoryEnabled', e.target.checked)} />
+            <span className="toggle-track"><span className="toggle-thumb"></span></span>
+            <span className="toggle-label">Enable inventory tracking</span>
+          </label>
+          <label className="settings-toggle">
+            <input type="checkbox" checked={form.allowNegativeStock === true} onChange={e => set('allowNegativeStock', e.target.checked)} />
+            <span className="toggle-track"><span className="toggle-thumb"></span></span>
+            <span className="toggle-label">Allow stock to go below zero</span>
+          </label>
+        </div>
+      </SECTION>
+
+      <SECTION id="appearance" isOpen={openSection === 'appearance'} onToggle={toggleSection} icon="fa-palette" title="Invoice Appearance" subtitle="Choose how your bills look when printed or downloaded">
+        <div className="invoice-settings-layout">
+          <div className="invoice-template-picker">
+            <div className="invoice-settings-heading"><strong>Invoice Templates</strong><span>Live preview</span></div>
+            <div className="invoice-template-grid">
+              {INVOICE_TEMPLATES.map(template => (
+                <button type="button" key={template.id} className={`invoice-template-card ${form.invoiceTemplate === template.id ? 'is-selected' : ''}`} onClick={() => set('invoiceTemplate', template.id)} aria-pressed={form.invoiceTemplate === template.id}>
+                  <span className={`invoice-template-mini invoice-template-mini--${template.id}`} style={{ '--preview-accent': form.invoiceAccentColor }}><i className={`fas ${template.icon}`}></i><b>MYBEEZNUS</b><em>{template.id === 'professional' ? 'INVOICE' : 'BILL'}</em><small>Bill · Total</small></span>
+                  <strong>{template.name}</strong>
+                  <span>{template.description}</span>
+                  {form.invoiceTemplate === template.id && <b className="invoice-template-check"><i className="fas fa-check"></i> Selected</b>}
+                </button>
+              ))}
+            </div>
+            <div className="invoice-color-picker">
+              <div className="invoice-settings-heading"><strong>Accent Color</strong><span>Used for headings and totals</span></div>
+              <div className="invoice-color-swatches">
+                {INVOICE_ACCENT_PRESETS.map(color => <button type="button" key={color.value} className={`invoice-color-swatch ${form.invoiceAccentColor.toUpperCase() === color.value ? 'is-selected' : ''}`} style={{ backgroundColor: color.value }} onClick={() => set('invoiceAccentColor', color.value)} title={`${color.name} ${color.value}`} aria-label={`${color.name} ${color.value}`} />)}
+                <label className="invoice-custom-color"><span>Custom</span><input type="color" value={normalizeInvoiceAccent(form.invoiceAccentColor)} onChange={event => set('invoiceAccentColor', event.target.value)} aria-label="Custom invoice accent color" /></label>
+              </div>
+              <div className="invoice-selected-color"><span className="invoice-selected-dot" style={{ backgroundColor: normalizeInvoiceAccent(form.invoiceAccentColor) }}></span><span>{normalizeInvoiceAccent(form.invoiceAccentColor)}</span></div>
+            </div>
+            <button className="btn btn-primary invoice-preferences-save" onClick={saveInvoicePreferences} disabled={invoiceSaving}><i className={`fas ${invoiceSaving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i> {invoiceSaving ? 'Saving...' : 'Save Invoice Preferences'}</button>
+          </div>
+          <div className="invoice-live-preview">
+            <div className="invoice-settings-heading"><strong>Preview Invoice</strong><span>{INVOICE_TEMPLATES.find(template => template.id === form.invoiceTemplate)?.name}</span></div>
+            <div className="invoice-preview-frame"><BillDocument bill={previewBill} profile={previewProfile} customer={{ name: 'Aarav Mehta', mobile: '+91 98765 43210', email: 'aarav@example.com' }} /></div>
+          </div>
         </div>
       </SECTION>
 
       {/* WhatsApp */}
-      <SECTION icon="fa-whatsapp fab" title="WhatsApp Settings" subtitle="Auto-send bills to customers via WhatsApp">
+      <SECTION id="whatsapp" isOpen={openSection === 'whatsapp'} onToggle={toggleSection} icon="fa-whatsapp fab" title="WhatsApp Settings" subtitle="Auto-send bills to customers via WhatsApp">
         <div className="form-group">
           <label>Your WhatsApp Number</label>
           <input type="tel" value={form.whatsappNumber} onChange={e => set('whatsappNumber', e.target.value)} placeholder="+919876543210" />
@@ -282,7 +373,7 @@ function Settings() {
       </SECTION>
 
       {/* Account */}
-      <SECTION icon="fa-user-circle" title="Account" subtitle="Your login and account details">
+      <SECTION id="account" isOpen={openSection === 'account'} onToggle={toggleSection} icon="fa-user-circle" title="Account" subtitle="Your login and account details">
         <div className="settings-account-info">
           <img src={user.photoURL} alt={user.displayName} className="settings-avatar" />
           <div>

@@ -4,7 +4,7 @@ import { formatDate, formatDateTime } from '../utils/dateFormat';
 import ResponsiveFormModal from './ui/ResponsiveFormModal';
 import CustomerForm from './CustomerForm';
 
-const EMPTY_SUMMARY = { totalBills: 0, totalSpent: 0, recentBills: [] };
+const EMPTY_SUMMARY = { totalBills: 0, totalOutstanding: 0, overdueOutstanding: 0, recentBills: [] };
 
 function CustomerContextPanel({ user, profile, customer, refreshKey, onCustomerUpdated }) {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
@@ -48,12 +48,12 @@ function CustomerContextPanel({ user, profile, customer, refreshKey, onCustomerU
       <aside className={`customer-context-panel${expanded ? ' is-expanded' : ''}`} aria-label="Customer context">
         <div className="customer-context-header">
           <div className="customer-context-avatar" aria-hidden="true">{initials}</div>
-          <div className="customer-context-identity"><span className="billing-eyebrow">Customer context</span><strong>{customer.name}</strong><small>{customer.mobile || 'No mobile number'}</small></div>
+          <div className="customer-context-identity"><span className="billing-eyebrow">Customer context</span><strong>{customer.name}</strong><small>{customer.mobile || 'No mobile number'}</small>{customer.email && <small>{customer.email}</small>}</div>
           <button type="button" className="customer-context-close" aria-label="Collapse customer context" onClick={() => setExpanded(false)}><i className="fas fa-chevron-right"></i></button>
         </div>
         <div className="customer-context-actions"><button type="button" className="billing-text-button" onClick={() => setEditing(true)}><i className="fas fa-pen"></i> Edit customer</button><button type="button" className="billing-text-button" onClick={() => setExpanded(false)}>Close</button></div>
         <div className="customer-context-content">
-          <div className="customer-context-section"><span className="customer-context-section-title">Quick overview</span><div className="customer-context-stats"><div><strong>{summary.totalBills}</strong><small>Total bills</small></div><div><strong>{summary.recentBills[0] ? formatDate(summary.recentBills[0].createdAt) : '—'}</strong><small>Last bill</small></div></div></div>
+          <div className="customer-context-section"><span className="customer-context-section-title">Quick overview</span><div className="customer-context-stats"><div><strong>{summary.totalBills}</strong><small>Total bills</small></div><div><strong>{summary.recentBills[0] ? formatDate(summary.recentBills[0].createdAt) : '—'}</strong><small>Last bill</small></div><div><strong style={{ color: summary.totalOutstanding > 0 ? '#b45309' : 'var(--color-success)' }}>₹{summary.totalOutstanding.toFixed(2)}</strong><small>Outstanding</small></div></div>{summary.overdueOutstanding > 0 && <div style={{ marginTop: 10, color: 'var(--color-danger)', fontSize: 12, fontWeight: 700 }}>₹{summary.overdueOutstanding.toFixed(2)} overdue</div>}</div>
           {loading && <div className="customer-context-loading"><i className="fas fa-circle-notch fa-spin"></i> Loading bill history...</div>}
           {error && <div className="customer-context-error">Customer details couldn&apos;t be loaded. <button type="button" onClick={reloadSummary}>Retry</button></div>}
           {!loading && !error && <div className="customer-context-section"><span className="customer-context-section-title">Activity timeline</span><div className="customer-context-timeline"><div className="customer-context-event"><span className="customer-context-event-dot"><i className="fas fa-user-plus"></i></span><div><strong>Customer added</strong><small>{customer.createdAt ? formatDateTime(customer.createdAt) : 'Date unavailable'}</small></div></div>{summary.recentBills.map(bill => <div className="customer-context-event" key={bill.id}><span className="customer-context-event-dot"><i className="fas fa-receipt"></i></span><div><strong>Bill {bill.billNumber}</strong><small>{formatDateTime(bill.createdAt)} · ₹{bill.finalAmount.toFixed(2)}</small></div></div>)}</div>{summary.recentBills.length === 0 && <p className="customer-context-empty">No bills recorded yet</p>}</div>}

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { customerAPI } from '../utils/firestoreAPI';
-import { normalizeMobile, isValidMobile, isValidName, isValidDob } from '../utils/validation';
+import { normalizeMobile, isValidMobile, isValidName, isValidDob, isValidEmail } from '../utils/validation';
 
-const EMPTY_FORM = { name: '', mobile: '', dob: '', gender: '', customerType: '', address: '', notes: '' };
+const EMPTY_FORM = { name: '', mobile: '', email: '', dob: '', gender: '', customerType: '', address: '', notes: '' };
 
 function CustomerForm({ user, profile, initialValues = EMPTY_FORM, editingCustomer = null, onSaved, onCancel, onSelectExisting, formId = 'customer-form', showActions = true, onBusyChange }) {
   const [formData, setFormData] = useState({ ...EMPTY_FORM, ...initialValues });
@@ -29,6 +29,7 @@ function CustomerForm({ user, profile, initialValues = EMPTY_FORM, editingCustom
     const nextErrors = {};
     if (!isValidName(formData.name)) nextErrors.name = 'Enter a name between 2 and 60 characters.';
     if (!formData.mobile || !isValidMobile(formData.mobile)) nextErrors.mobile = 'Enter a valid 10-digit mobile starting with 6-9.';
+    if (!isValidEmail(formData.email)) nextErrors.email = 'Enter a valid email address.';
     if (!isValidDob(formData.dob)) nextErrors.dob = 'Date of birth cannot be in the future.';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -74,6 +75,11 @@ function CustomerForm({ user, profile, initialValues = EMPTY_FORM, editingCustom
         <input id="customer-mobile" type="tel" inputMode="numeric" maxLength={12} placeholder="10-digit mobile" value={formData.mobile} onChange={e => updateField('mobile', e.target.value.replace(/[^0-9+ ]/g, ''))} />
         {errors.mobile && <span className="field-error">{errors.mobile}</span>}
         {duplicateCustomer && <div className="customer-duplicate-notice">This mobile belongs to <strong>{duplicateCustomer.name}</strong>. <button type="button" onClick={() => onSelectExisting?.(duplicateCustomer)}>Use existing customer</button></div>}
+      </div>
+      <div className="form-group">
+        <label htmlFor="customer-email">Email <span className="form-optional">Optional</span></label>
+        <input id="customer-email" type="email" maxLength={254} placeholder="customer@example.com" value={formData.email} onChange={e => updateField('email', e.target.value)} />
+        {errors.email && <span className="field-error">{errors.email}</span>}
       </div>
       <div className="form-group">
         <label htmlFor="customer-dob">Date of Birth</label>

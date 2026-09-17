@@ -8,6 +8,8 @@ import { formatDateTime } from '../utils/dateFormat';
 import { showToast, showConfirmation } from '../services/notificationService';
 import { buildBillMessage, openWhatsApp } from '../utils/whatsapp';
 import { isValidMobile } from '../utils/validation';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
+import { calculatePaymentStatus, getPaymentBalance, PAYMENT_STATUSES } from '../utils/paymentStatus';
 
 function Bills() {
   const { user } = useAuth();
@@ -24,11 +26,14 @@ function Bills() {
   const [billItems, setBillItems] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [dueDate, setDueDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filterMode, setFilterMode] = useState('today');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
 
   useEffect(() => { loadBills(); }, []); // eslint-disable-line
 
@@ -48,6 +53,8 @@ function Bills() {
     setBillItems(data.items || []);
     setDiscount(data.discount || 0);
     setPaymentMode(data.paymentMode || 'Cash');
+    setPaidAmount(Number(data.paidAmount) || 0);
+    setDueDate(data.dueDate || '');
     setShowEditModal(true);
   };
 
@@ -59,7 +66,7 @@ function Bills() {
   const addItemToBill = (item) => {
     const ex = billItems.findIndex(bi => bi.itemId === item.id);
     if (ex >= 0) setBillItems(billItems.map((bi, i) => i === ex ? { ...bi, quantity: bi.quantity + 1 } : bi));
-    else setBillItems([...billItems, { itemId: item.id, name: item.name, price: item.price, tax: item.tax || 0, quantity: 1 }]);
+    else setBillItems([...billItems, { itemId: item.id, name: item.name, price: item.price, tax: item.tax || 0, quantity: 1, unit: item.unit }]);
   };
 
   const calculateTotals = () => {
@@ -75,8 +82,13 @@ function Bills() {
   const updateBill = async () => {
     try {
       const totals = calculateTotals();
+      const normalizedPaidAmount = Math.max(0, Number(paidAmount) || 0);
+      if (normalizedPaidAmount > totals.finalTotal) {
+        showToast({ type: 'warning', message: 'Paid amount must be between ₹0 and the total payable amount.' });
+        return;
+      }
       await billAPI.update(user.uid, editingBill.id, {
-        items: billItems, discount, paymentMode,
+        items: billItems, discount, paymentMode, paidAmount: normalizedPaidAmount, dueDate,
         totalAmount: totals.subtotal, tax: totals.tax, finalAmount: totals.finalTotal
       });
       setShowEditModal(false);
@@ -125,7 +137,8 @@ function Bills() {
       bill.billNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       bill.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       bill.customerMobile?.includes(searchQuery);
-    return dateMatch && searchMatch;
+    const statusMatch = paymentStatusFilter === 'ALL' || calculatePaymentStatus(bill.finalAmount, bill.paidAmount, bill.dueDate) === paymentStatusFilter;
+    return dateMatch && searchMatch && statusMatch;
   });
 
   const totals = calculateTotals();
@@ -169,6 +182,12 @@ function Bills() {
           <input type="text" placeholder="Search bill number, customer name or mobile..."
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </label>
+        <label className="bills-status-filter">Payment status
+          <select value={paymentStatusFilter} onChange={e => setPaymentStatusFilter(e.target.value)}>
+            <option value="ALL">All</option>
+            {Object.values(PAYMENT_STATUSES).map(status => <option key={status} value={status}>{status.replace('_', ' ')}</option>)}
+          </select>
+        </label>
       </section>
 
       <section className="bills-list" aria-label="Bills list">
@@ -199,7 +218,7 @@ function Bills() {
             </div>
             <div>
               <div className="bill-amount">₹{bill.finalAmount?.toFixed(2)}</div>
-              <div className="bill-payment">{bill.paymentMode}</div>
+              <div className="bill-payment"><PaymentStatusBadge totalAmount={bill.finalAmount} paidAmount={bill.paidAmount} dueDate={bill.dueDate} />{getPaymentBalance(bill.finalAmount, bill.paidAmount) > 0 && <small>Balance ₹{getPaymentBalance(bill.finalAmount, bill.paidAmount).toFixed(2)}</small>}</div>
             </div>
             <div className="row-actions bills-row-actions">
               <button className="btn btn-ghost bills-action-button" onClick={event => { event.stopPropagation(); openEditModal(bill); }} title="Edit bill" aria-label={`Edit ${bill.billNumber}`}>
@@ -291,6 +310,7 @@ function Bills() {
                     </button>
                   ))}
                 </div>
+                <div className="edit-bill-payment-fields"><label>Amount paid<input type="number" min="0" max={Math.max(0, totals.finalTotal)} step="0.01" value={paidAmount} onFocus={e => e.target.select()} onChange={e => setPaidAmount(e.target.value)} /></label><label>Due date<input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></label><PaymentStatusBadge totalAmount={totals.finalTotal} paidAmount={paidAmount} dueDate={dueDate} /></div>
                 <button className="btn btn-primary" onClick={updateBill} style={{ width: '100%', padding: '12px', fontSize: 15 }}>
                   <i className="fas fa-check"></i> Update Bill
                 </button>

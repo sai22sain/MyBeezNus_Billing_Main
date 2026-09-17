@@ -5,11 +5,12 @@ import { CACHE_TTL } from '../utils/core/cache';
 import { useAuth } from '../context/AuthContext';
 import { showToast, showConfirmation } from '../services/notificationService';
 import ResponsiveFormModal from '../components/ui/ResponsiveFormModal';
+import UnitSelect from '../components/ui/UnitSelect';
 
 function Items() {
   const { user } = useAuth();
   // Reference data shared with NewBill/Bills via the per-user cache.
-  const { data: items, refresh: refreshItems } = useCachedQuery(
+  const { refresh: refreshItems } = useCachedQuery(
     user?.uid, cacheKeys.activeItems, CACHE_TTL.activeItems,
     () => itemAPI.getActive(user.uid)
   );
@@ -25,7 +26,7 @@ function Items() {
   const [newCategory, setNewCategory] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', tax: 0, isActive: true });
+  const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', tax: 0, isActive: true, itemType: 'SERVICE', trackInventory: false, stockQuantity: 0, unit: 'pcs', lowStockThreshold: 0, sku: '', purchasePrice: 0 });
   const [itemSaving, setItemSaving] = useState(false);
 
   useEffect(() => { loadData(); }, []); // eslint-disable-line
@@ -39,13 +40,13 @@ function Items() {
 
   const openAddModal = () => {
     setEditingItem(null);
-    setFormData({ name: '', categoryId: categories[0]?.id || '', price: '', tax: 0, isActive: true });
+    setFormData({ name: '', categoryId: categories[0]?.id || '', price: '', tax: 0, isActive: true, itemType: 'SERVICE', trackInventory: false, stockQuantity: 0, unit: 'pcs', lowStockThreshold: 0, sku: '', purchasePrice: 0 });
     setShowModal(true);
   };
 
   const openEditModal = (item) => {
     setEditingItem(item);
-    setFormData({ name: item.name, categoryId: item.categoryId, price: item.price, tax: item.tax, isActive: item.isActive });
+    setFormData({ name: item.name, categoryId: item.categoryId, price: item.price, tax: item.tax, isActive: item.isActive, itemType: item.itemType, trackInventory: item.trackInventory, stockQuantity: item.stockQuantity, unit: item.unit, lowStockThreshold: item.lowStockThreshold, sku: item.sku, purchasePrice: item.purchasePrice });
     setShowModal(true);
   };
 
@@ -112,7 +113,7 @@ function Items() {
     });
   };
 
-  const filteredItems = items.filter(item =>
+  const filteredItems = allItems.filter(item =>
     (!selectedCategory || item.categoryId === selectedCategory) &&
     (!searchQuery || item.name?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -134,12 +135,12 @@ function Items() {
       <div className="card">
         <div className="category-tabs">
           <button className={`category-tab ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>
-            All <span style={{ opacity: 0.7 }}>({items.length})</span>
+            All <span style={{ opacity: 0.7 }}>({allItems.length})</span>
           </button>
           {categories.map(cat => (
             <button key={cat.id} className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat.id)}>
-              {cat.name} <span style={{ opacity: 0.7 }}>({items.filter(i => i.categoryId === cat.id).length})</span>
+              {cat.name} <span style={{ opacity: 0.7 }}>({allItems.filter(i => i.categoryId === cat.id).length})</span>
               <span className="category-tab-del" onClick={e => { e.stopPropagation(); deleteCategory(cat.id); }}>×</span>
             </button>
           ))}
@@ -165,6 +166,7 @@ function Items() {
                 <div className="service-card-category">{item.categoryName}</div>
                 <div className="service-card-price">₹{item.price}</div>
                 <div className="service-card-tax">Tax: {item.tax}%</div>
+                {item.trackInventory && <div className="service-card-tax">Stock: {item.stockQuantity} {item.unit}{item.stockQuantity <= item.lowStockThreshold ? ' · Low' : ''}</div>}
                 <div className="service-card-actions">
                   <button className="btn btn-ghost" onClick={() => openEditModal(item)} style={{ flex: 1 }}>
                     <i className="fas fa-edit"></i> Edit
@@ -206,6 +208,22 @@ function Items() {
                 <input type="number" value={formData.tax} onChange={e => setFormData({ ...formData, tax: parseFloat(e.target.value) || 0 })} />
               </div>
             </div>
+            <div className="form-group">
+              <label>Item Type</label>
+              <select value={formData.itemType} onChange={e => setFormData({ ...formData, itemType: e.target.value, trackInventory: e.target.value === 'PRODUCT' ? formData.trackInventory : false })}>
+                <option value="SERVICE">Service</option>
+                <option value="PRODUCT">Product</option>
+              </select>
+            </div>
+            {formData.itemType === 'PRODUCT' && <>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}><input type="checkbox" checked={formData.trackInventory} onChange={e => setFormData({ ...formData, trackInventory: e.target.checked })} /> Track inventory</label>
+              {formData.trackInventory && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group"><label>Opening Stock</label><input type="number" min="0" step="any" value={formData.stockQuantity} onChange={e => setFormData({ ...formData, stockQuantity: Number(e.target.value) || 0 })} /></div>
+                <div className="form-group"><label id="item-unit-label">Unit</label><UnitSelect value={formData.unit} onChange={unit => setFormData({ ...formData, unit })} aria-labelledby="item-unit-label" /></div>
+                <div className="form-group"><label>Low Stock Threshold</label><input type="number" min="0" step="any" value={formData.lowStockThreshold} onChange={e => setFormData({ ...formData, lowStockThreshold: Number(e.target.value) || 0 })} /></div>
+                <div className="form-group"><label>SKU</label><input type="text" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} /></div>
+              </div>}
+            </>}
       </ResponsiveFormModal>}
 
       {showCategoryModal && (
