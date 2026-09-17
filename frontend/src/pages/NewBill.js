@@ -10,6 +10,7 @@ import { showToast } from '../services/notificationService';
 import { buildBillMessage, openWhatsApp } from '../utils/whatsapp';
 import { useNavigate } from 'react-router-dom';
 import CustomerForm from '../components/CustomerForm';
+import CustomerContextPanel from '../components/CustomerContextPanel';
 import ResponsiveFormModal from '../components/ui/ResponsiveFormModal';
 
 function NewBill() {
@@ -31,6 +32,7 @@ function NewBill() {
   const [saving, setSaving] = useState(false);
   const [savingMode, setSavingMode] = useState(null);
   const [customerSaving, setCustomerSaving] = useState(false);
+  const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
   // Reference data served from the shared per-user cache (5-min cats,
   // 2-min active items). Mutations on other pages invalidate it.
@@ -63,7 +65,7 @@ function NewBill() {
     const mobile = mobileMatch ? mobileMatch[1] : '';
     const detectedName = rawQuery.replace(mobileMatch?.[0] || '', '').replace(/[+,()-]/g, ' ').replace(/\s+/g, ' ').trim();
     const name = /[a-zA-Z]/.test(detectedName) ? detectedName : '';
-    setCustomerPrefill({ name, mobile, dob: '', gender: '' });
+    setCustomerPrefill({ name, mobile, dob: '', gender: '', customerType: '', address: '', notes: '' });
     setShowCustomerModal(true);
   };
 
@@ -136,6 +138,7 @@ function NewBill() {
         }
       }
       setSelectedCustomer(null); setWalkInCustomer(false); setBillItems([]); setDiscount(0); setPaymentMode('Cash');
+      setCustomerRefreshKey(key => key + 1);
     } catch { showToast({ type: 'error', message: 'Unable to save the bill. Please try again.' }); }
     finally { setSaving(false); setSavingMode(null); }
   };
@@ -161,7 +164,7 @@ function NewBill() {
         </div>
       </header>
 
-      <div className="billing-workspace">
+      <div className={`billing-workspace${selectedCustomer ? ' has-customer-context' : ''}`}>
         <section className="billing-catalog" aria-labelledby="catalog-title">
           <div className="billing-section-heading">
             <div><span className="billing-eyebrow">Build the bill</span><h2 id="catalog-title">Item catalog</h2></div>
@@ -207,6 +210,14 @@ function NewBill() {
           <div className="billing-payment"><span className="billing-eyebrow">Payment method</span><div className="billing-payment-options">{['Cash', 'UPI', 'Card'].map(mode => <button type="button" key={mode} className={paymentMode === mode ? 'active' : ''} onClick={() => setPaymentMode(mode)}><i className={`fas ${mode === 'Cash' ? 'fa-money-bill' : mode === 'UPI' ? 'fa-mobile-screen-button' : 'fa-credit-card'}`}></i>{mode}</button>)}</div></div>
           <div className="billing-actions"><button type="button" className="billing-save-button" onClick={() => createBill(false)} disabled={saving}><i className={`fas ${savingMode === 'save' ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>{savingMode === 'save' ? 'Saving...' : 'Save bill'}</button><button type="button" className="billing-whatsapp-button" onClick={() => createBill(true)} disabled={saving}><i className={`fab ${savingMode === 'whatsapp' ? 'fa-spinner fa-spin' : 'fa-whatsapp'}`}></i>{savingMode === 'whatsapp' ? 'Saving & preparing...' : 'Save & send via WhatsApp'}</button></div>
         </section>
+
+        <CustomerContextPanel
+          user={user}
+          profile={profile}
+          customer={selectedCustomer}
+          refreshKey={customerRefreshKey}
+          onCustomerUpdated={updated => { setSelectedCustomer(current => ({ ...current, ...updated })); setCustomerRefreshKey(key => key + 1); }}
+        />
       </div>
 
       {showCustomerModal && <ResponsiveFormModal title="Add New Customer" labelledBy="billing-customer-form-title" maxWidth={440} onClose={() => setShowCustomerModal(false)} footer={<><button type="button" className="btn btn-ghost" onClick={() => setShowCustomerModal(false)} disabled={customerSaving}>Cancel</button><button type="submit" form="billing-customer-form" className="btn btn-primary" disabled={customerSaving}><i className={`fas ${customerSaving ? 'fa-spinner fa-spin' : 'fa-user-plus'}`}></i> {customerSaving ? 'Saving...' : 'Add Customer'}</button></>}>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { customerAPI } from '../utils/firestoreAPI';
 import { normalizeMobile, isValidMobile, isValidName, isValidDob } from '../utils/validation';
 
-const EMPTY_FORM = { name: '', mobile: '', dob: '', gender: '' };
+const EMPTY_FORM = { name: '', mobile: '', dob: '', gender: '', customerType: '', address: '', notes: '' };
 
 function CustomerForm({ user, profile, initialValues = EMPTY_FORM, editingCustomer = null, onSaved, onCancel, onSelectExisting, formId = 'customer-form', showActions = true, onBusyChange }) {
   const [formData, setFormData] = useState({ ...EMPTY_FORM, ...initialValues });
@@ -85,6 +85,20 @@ function CustomerForm({ user, profile, initialValues = EMPTY_FORM, editingCustom
         <select id="customer-gender" value={formData.gender} onChange={e => updateField('gender', e.target.value)}>
           <option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>
         </select>
+      </div>
+      <div className="form-group">
+        <label htmlFor="customer-type">Customer Type</label>
+        <select id="customer-type" value={formData.customerType} onChange={e => updateField('customerType', e.target.value)}>
+          <option value="">Select</option><option value="Individual">Individual</option><option value="Business">Business</option>
+        </select>
+      </div>
+      <div className="form-group">
+        <label htmlFor="customer-address">Address</label>
+        <textarea id="customer-address" maxLength={240} rows={2} value={formData.address} onChange={e => updateField('address', e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label htmlFor="customer-notes">Notes</label>
+        <textarea id="customer-notes" maxLength={500} rows={3} placeholder="Useful notes about this customer" value={formData.notes} onChange={e => updateField('notes', e.target.value)} />
       </div>
       {submitError && <div className="form-submit-error">{submitError}</div>}
       {showActions && <div className="customer-form-actions">

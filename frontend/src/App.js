@@ -7,6 +7,7 @@ import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import NewBill from './pages/NewBill';
 import Bills from './pages/Bills';
+import BillDetails from './pages/BillDetails';
 import Customers from './pages/Customers';
 import Items from './pages/Items';
 import Reports from './pages/Reports';
@@ -110,6 +111,7 @@ function AuthenticatedApp() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/new-bill" element={<NewBill />} />
         <Route path="/bills" element={<Bills />} />
+        <Route path="/bills/:billId" element={<BillDetails />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/items" element={<Items />} />
         <Route path="/reports" element={<Reports />} />

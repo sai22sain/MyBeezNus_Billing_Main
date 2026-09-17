@@ -21,6 +21,9 @@ const toCustomer = (r) => r && {
   mobile: r.mobile,
   dob: r.dob,
   gender: r.gender,
+  address: r.address || '',
+  notes: r.notes || '',
+  customerType: r.customer_type || '',
   createdAt: r.created_at,
 };
 
@@ -121,6 +124,9 @@ export const customerAPI = {
         mobile: data.mobile || '',
         dob: data.dob || '',
         gender: data.gender || '',
+        address: data.address || '',
+        notes: data.notes || '',
+        customer_type: data.customerType || '',
       })
       .select()
       .single();
@@ -130,7 +136,15 @@ export const customerAPI = {
   update: async (uid, id, data) => {
     const { error } = await supabase
       .from('customers')
-      .update({ name: data.name, mobile: data.mobile, dob: data.dob, gender: data.gender })
+      .update({
+        name: data.name,
+        mobile: data.mobile,
+        dob: data.dob,
+        gender: data.gender,
+        address: data.address || '',
+        notes: data.notes || '',
+        customer_type: data.customerType || '',
+      })
       .eq('user_id', uid)
       .eq('id', id);
     if (error) throw error;
@@ -152,6 +166,26 @@ export const customerAPI = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map(toBill);
+  },
+  getSummary: async (uid, customerId) => {
+    const { data, error, count } = await supabase
+      .from('bills')
+      .select('id,bill_number,final_amount,created_at', { count: 'exact' })
+      .eq('user_id', uid)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (error) throw error;
+    const bills = data || [];
+    return {
+      totalBills: count || 0,
+      recentBills: bills.map(bill => ({
+        id: bill.id,
+        billNumber: bill.bill_number,
+        finalAmount: Number(bill.final_amount || 0),
+        createdAt: bill.created_at,
+      })),
+    };
   },
   getBirthdays: async (uid) => {
     const today = new Date();
@@ -293,7 +327,7 @@ export const billAPI = {
     const backendRes = await backendPromise;
     let billNumber = backendRes?.number;
     if (!billNumber) {
-      throw new Error('Unable to allocate a globally unique bill number. Please try again.');
+      throw new Error('Unable to allocate your bill number. Please try again.');
     }
 
     const { data: row, error } = await supabase

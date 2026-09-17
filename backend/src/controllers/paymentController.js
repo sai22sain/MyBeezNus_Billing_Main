@@ -19,7 +19,8 @@ const getRazorpay = () => {
 // Create Razorpay order
 const createOrder = async (req, res) => {
   try {
-    const { plan, userId } = req.body;
+    const { plan } = req.body;
+    const userId = req.user.uid;
     if (!PLANS[plan]) return res.status(400).json({ error: 'Invalid plan' });
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
       return res.status(500).json({ error: 'Payment gateway is not configured on the server' });
@@ -49,7 +50,7 @@ const createOrder = async (req, res) => {
 // Verify payment signature and return subscription data
 const verifyPayment = (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan, userId } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
 
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto

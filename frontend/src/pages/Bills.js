@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { billAPI, itemAPI, cacheKeys } from '../utils/firestoreAPI';
 import { useCachedQuery } from '../hooks/useCachedQuery';
 import { CACHE_TTL } from '../utils/core/cache';
@@ -10,6 +11,8 @@ import { isValidMobile } from '../utils/validation';
 
 function Bills() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [bills, setBills] = useState([]);
   // Active items shared with Items/NewBill via the per-user cache.
   const { data: allItems } = useCachedQuery(
@@ -28,6 +31,14 @@ function Bills() {
   const [filterMode, setFilterMode] = useState('today');
 
   useEffect(() => { loadBills(); }, []); // eslint-disable-line
+
+  useEffect(() => {
+    const editBillId = location.state?.editBillId;
+    if (!editBillId || !bills.length) return;
+    const bill = bills.find(item => item.id === editBillId);
+    if (bill) openEditModal(bill);
+    navigate('/bills', { replace: true, state: {} });
+  }, [bills, location.state, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadBills = async () => { setBills(await billAPI.getAll(user.uid)); };
 
@@ -120,13 +131,22 @@ function Bills() {
   const totals = calculateTotals();
 
   return (
-    <div>
-      <div className="page-header"><h1>Bills</h1></div>
+    <div className="bills-page">
+      <header className="bills-header">
+        <div>
+          <span className="bills-eyebrow"><i className="fas fa-receipt"></i> Billing history</span>
+          <h1>Bills</h1>
+          <p>Manage and review your billing history.</p>
+        </div>
+        <button className="btn btn-primary bills-new-button" onClick={() => navigate('/new-bill')}>
+          <i className="fas fa-plus"></i> New Bill
+        </button>
+      </header>
 
-      <div className="card">
-        <div className="filter-bar">
+      <section className="bills-toolbar" aria-label="Bill filters">
+        <div className="bills-filter-group" role="group" aria-label="Date filter">
           {['today', 'date', 'range'].map(mode => (
-            <button key={mode} className={`btn ${filterMode === mode ? 'btn-primary' : 'btn-ghost'}`}
+            <button key={mode} className={`bills-filter-button ${filterMode === mode ? 'is-active' : ''}`}
               onClick={() => setFilterMode(mode)}>
               {mode === 'today' ? 'Today' : mode === 'date' ? 'By Date' : 'Date Range'}
             </button>
@@ -137,58 +157,66 @@ function Bills() {
           {filterMode === 'range' && (
             <>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-              <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>to</span>
+              <span className="bills-date-separator">to</span>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
             </>
           )}
         </div>
 
-        <div className="search-box" style={{ marginBottom: 0 }}>
+        <label className="bills-search">
+          <i className="fas fa-search" aria-hidden="true"></i>
+          <span className="sr-only">Search bills</span>
           <input type="text" placeholder="Search bill number, customer name or mobile..."
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-        </div>
-      </div>
+        </label>
+      </section>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'grid', gridTemplateColumns: '1.8fr 1.4fr 1fr auto', gap: 16 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--color-text-muted)' }}>Bill</span>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--color-text-muted)' }}>Customer</span>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--color-text-muted)' }}>Amount</span>
-          <span></span>
+      <section className="bills-list" aria-label="Bills list">
+        <div className="bills-list-header" aria-hidden="true">
+          <span>Bill</span>
+          <span>Customer</span>
+          <span>Amount</span>
+          <span>Actions</span>
         </div>
 
         {filteredBills.length === 0 ? (
-          <div className="empty-state"><i className="fas fa-receipt"></i><p>No bills found</p></div>
+          <div className="bills-empty-state">
+            <span className="bills-empty-icon"><i className="fas fa-receipt"></i></span>
+            <strong>{bills.length === 0 ? 'No bills yet' : 'No bills found'}</strong>
+            <p>{bills.length === 0 ? 'Create your first bill to start tracking your sales.' : 'Try adjusting your filters or search phrase.'}</p>
+            {bills.length === 0 && <button className="btn btn-primary" onClick={() => navigate('/new-bill')}><i className="fas fa-plus"></i> Create New Bill</button>}
+          </div>
         ) : filteredBills.map(bill => (
-          <div key={bill.id} className="bill-row">
+          <div key={bill.id} className="bill-row bills-row" onClick={() => navigate(`/bills/${bill.id}`)} role="button" tabIndex={0}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') navigate(`/bills/${bill.id}`); }}>
             <div>
               <div className="bill-number">{bill.billNumber}</div>
               <div className="bill-date">{formatDateTime(bill.createdAt)}</div>
             </div>
             <div>
-              <div className="bill-customer-name">{bill.customerName}</div>
-              <div className="bill-customer-mobile">{bill.customerMobile}</div>
+              <div className="bill-customer-name">{bill.customerName || 'Walk-in Customer'}</div>
+              <div className="bill-customer-mobile">{bill.customerMobile || 'No mobile number'}</div>
             </div>
             <div>
               <div className="bill-amount">₹{bill.finalAmount?.toFixed(2)}</div>
               <div className="bill-payment">{bill.paymentMode}</div>
             </div>
-            <div className="row-actions">
-              <button className="btn btn-ghost" onClick={() => openEditModal(bill)} title="Edit">
+            <div className="row-actions bills-row-actions">
+              <button className="btn btn-ghost bills-action-button" onClick={event => { event.stopPropagation(); openEditModal(bill); }} title="Edit bill" aria-label={`Edit ${bill.billNumber}`}>
                 <i className="fas fa-edit"></i>
               </button>
-              <button className="btn btn-ghost" onClick={() => resendWhatsApp(bill)} title="WhatsApp"
+              <button className="btn btn-ghost bills-action-button bills-whatsapp-button" onClick={event => { event.stopPropagation(); resendWhatsApp(bill); }} title="Send by WhatsApp" aria-label={`Send ${bill.billNumber} by WhatsApp`}
                 style={{ color: '#16a34a' }}>
                 <i className="fab fa-whatsapp"></i>
               </button>
-              <button className="btn btn-ghost" onClick={() => deleteBill(bill.id)} title="Delete"
+              <button className="btn btn-ghost bills-action-button bills-delete-button" onClick={event => { event.stopPropagation(); deleteBill(bill.id); }} title="Delete bill" aria-label={`Delete ${bill.billNumber}`}
                 style={{ color: 'var(--color-danger)' }}>
                 <i className="fas fa-trash"></i>
               </button>
             </div>
           </div>
         ))}
-      </div>
+      </section>
 
       {showEditModal && editingBill && (
         <div className="modal modal-sheet">

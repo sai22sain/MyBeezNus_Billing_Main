@@ -5,6 +5,10 @@ const { requireAuth, listUserRows } = require('../lib/tenant');
 const { getAdminClient } = require('../lib/supabase');
 const reportController = require('../controllers/reportController');
 
+// Every report, including the legacy-compatible endpoints below, is scoped
+// to the authenticated user's records.
+router.use(requireAuth);
+
 // Legacy SQLite-backed report endpoints (unused by the current Supabase frontend).
 router.get('/dashboard', reportController.getDashboardStats);
 router.get('/daily', reportController.getDailyRevenue);
